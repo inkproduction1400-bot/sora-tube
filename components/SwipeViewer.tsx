@@ -1,7 +1,7 @@
 // components/SwipeViewer.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEventHandler, type WheelEventHandler } from "react";
 import Link from "next/link";
 
 type V = {
@@ -26,7 +26,7 @@ export default function SwipeViewer({
     return idx >= 0 ? idx : 0;
   }, [videos, initialId]);
 
-  const [idx, setIdx] = useState(startIndex);
+  const [idx, setIdx] = useState<number>(startIndex);
   const [bounce, setBounce] = useState<"top" | "bottom" | null>(null);
 
   const curr = videos[idx];
@@ -45,55 +45,51 @@ export default function SwipeViewer({
   };
   const bounceOnce = (where: "top" | "bottom") => {
     setBounce(where);
-    setTimeout(() => setBounce(null), 180);
+    window.setTimeout(() => setBounce(null), 180);
   };
 
-  const onTouchStart: React.TouchEventHandler<HTMLDivElement> = (e) => {
+  const onTouchStart: TouchEventHandler<HTMLDivElement> = (e) => {
     touchStartY.current = e.touches[0].clientY;
   };
-  const onTouchEnd: React.TouchEventHandler<HTMLDivElement> = (e) => {
+  const onTouchEnd: TouchEventHandler<HTMLDivElement> = (e) => {
     if (touchStartY.current == null) return;
     const dy = e.changedTouches[0].clientY - touchStartY.current;
     if (Math.abs(dy) > THRESH) {
-      if (dy > 0) toPrev(); // 下→上へ戻す：前へ
-      else toNext();        // 上へスワイプ：次へ
+      if (dy > 0) toPrev(); // 下スワイプ：前へ
+      else toNext();        // 上スワイプ：次へ
     }
     touchStartY.current = null;
   };
 
-  // マウスホイール・キーボードも対応
-  const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
+  // マウスホイール・キーボードも対応（hooks依存警告を避けるため、effect内で直接 setIdx 使用）
+  const onWheel: WheelEventHandler<HTMLDivElement> = (e) => {
     if (e.deltaY > 10) toNext();
     else if (e.deltaY < -10) toPrev();
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp") toPrev();
-      if (e.key === "ArrowDown" || e.key === " ") toNext();
+      if (e.key === "ArrowUp") {
+        setIdx((prev) => (prev > 0 ? prev - 1 : prev));
+      }
+      if (e.key === "ArrowDown" || e.key === " ") {
+        setIdx((prev) => (prev < videos.length - 1 ? prev + 1 : prev));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idx, videos.length]);
+  }, [videos.length]);
 
-  // 再生コントロール
+  // 再生コントロール（初期はミュートで自動再生OK）
   const vref = useRef<HTMLVideoElement | null>(null);
-  const [muted, setMuted] = useState(true); // 初期はミュートで自動再生OK
-  const [ready, setReady] = useState(false);
+  const [muted, setMuted] = useState<boolean>(true);
 
-  // インデックス変更時：ミュートに戻して準備し直す
-  useEffect(() => {
-    setMuted(true);
-    setReady(false);
-  }, [idx]);
-
-  // 動画ソースやミュート状態が変わったら再生を合わせる
+  // インデックス/ミュート状態が変わったら再生を合わせる
   useEffect(() => {
     const v = vref.current;
     if (!v) return;
     v.muted = muted;
-    v.play().catch(() => {
-      // iOSでユーザー操作がないと失敗することがあるが、muted時は通る想定
-    });
+    // 自動再生を試行（iOSで失敗しても問題ない）
+    void v.play().catch(() => {});
   }, [idx, curr?.fileUrl, muted]);
 
   if (!curr) {
@@ -149,7 +145,6 @@ export default function SwipeViewer({
               autoPlay             // muted時のみ自動再生可
               preload="auto"
               muted={muted}
-              onLoadedData={() => setReady(true)}
             />
             {/* タイトル */}
             <div className="absolute bottom-3 left-3 right-3 line-clamp-2 rounded-lg bg-black/35 p-2 text-sm">
@@ -159,10 +154,11 @@ export default function SwipeViewer({
             {/* 音声ONボタン（初回タップで解除） */}
             {muted && (
               <button
+                type="button"
                 onClick={() => {
                   setMuted(false);
                   // ユーザー操作内で明示再生（iOS対策）
-                  vref.current?.play().catch(() => {});
+                  void vref.current?.play().catch(() => {});
                 }}
                 className="absolute bottom-3 right-3 rounded-lg bg-black/60 px-3 py-1 text-sm"
               >

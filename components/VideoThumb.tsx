@@ -1,20 +1,21 @@
 // components/VideoThumb.tsx
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Props = {
   id: string;
   title: string;
   category?: string;
-  thumbUrl?: string;   // 空文字あり
+  thumbUrl?: string; // 空文字あり
   durationSec?: number;
-  fileUrl?: string;    // 自動サムネ生成に使用（任意）
+  fileUrl?: string;  // 自動サムネ生成に使用（任意）
 };
 
 /** ▼▼ キャッシュ運用：v2 へ更新 ＋ URL正規化 ▼▼ */
 const CACHE_PREFIX = "poster:v2:";
-const FAIL_PREFIX  = "poster_fail:v2:";
+const FAIL_PREFIX = "poster_fail:v2:";
 const CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7日
 const FAIL_WINDOW_MS = 5 * 60 * 1000; // 5分
 
@@ -23,8 +24,6 @@ let inflight = 0;
 const MAX_CONCURRENCY = 4;
 const waitToken = async () => {
   while (inflight >= MAX_CONCURRENCY) {
-    // 40ms刻みで待機
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 40));
   }
   inflight++;
@@ -37,7 +36,7 @@ function normalizeFileUrl(raw?: string) {
   if (!raw) return "";
   try {
     const u = new URL(raw);
-    u.search = "";         // クエリ/ハッシュはキーに含めない
+    u.search = ""; // クエリ/ハッシュはキーに含めない
     u.hash = "";
     if (u.pathname.length > 1 && u.pathname.endsWith("/")) {
       u.pathname = u.pathname.replace(/\/+$/, ""); // 末尾スラッシュ除去
@@ -68,8 +67,7 @@ function migrateV1IfNeeded(fileUrl?: string) {
   try {
     const v2 = localStorage.getItem(v2Key);
     const srcV1 =
-      localStorage.getItem(normV1Key) ??
-      (rawV1Key ? localStorage.getItem(rawV1Key) : null);
+      localStorage.getItem(normV1Key) ?? (rawV1Key ? localStorage.getItem(rawV1Key) : null);
 
     if (srcV1 && !v2) {
       localStorage.setItem(v2Key, srcV1);
@@ -93,9 +91,8 @@ const FALLBACK_SVG =
   );
 
 // devログ（本番は沈黙）
-const dbg = (...args: any[]) => {
+const dbg = (...args: unknown[]) => {
   if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
     console.debug(...args);
   }
 };
@@ -126,15 +123,17 @@ export default function VideoThumb({
   const revokeUrlRef = useRef<string | null>(null);
   const triedRef = useRef(false);
 
-  const log = (...a: any[]) => dbg("[VT]", id, ...a);
+  const log = useCallback(
+    (...a: unknown[]) => dbg("[VT]", id, ...a),
+    [id]
+  );
 
   // IntersectionObserver: 可視範囲＋200pxで起動
   useEffect(() => {
     if (!hostRef.current) return;
-    const io = new IntersectionObserver(
-      ([entry]) => setVisible(entry.isIntersecting),
-      { rootMargin: "200px" }
-    );
+    const io = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), {
+      rootMargin: "200px",
+    });
     io.observe(hostRef.current);
     return () => io.disconnect();
   }, []);
@@ -165,7 +164,7 @@ export default function VideoThumb({
       log("cache read error", e);
     }
     // キャッシュがなければ、ロードは続行するので loading は一旦trueのまま
-  }, [thumbUrl, canGen, fileUrl]);
+  }, [thumbUrl, canGen, fileUrl, log]);
 
   // 2) 自動生成（常に Blob 経由に統一）
   useEffect(() => {
@@ -190,7 +189,8 @@ export default function VideoThumb({
 
     let cancelled = false;
 
-    (window as any).__vt_last = video; // デバッグ用
+    // window にデバッグ用フックを載せる（any を使わずに）
+    (window as unknown as Record<string, unknown>).__vt_last = video;
 
     const onErr = () => log("video error:", video.error?.message ?? video.error ?? "(no detail)");
     const onStalled = () => log("video stalled");
@@ -278,10 +278,12 @@ export default function VideoThumb({
         video.crossOrigin = "anonymous";
         video.preload = "auto";
         video.muted = true;
-        (video as any).playsInline = true;
+        video.playsInline = true;
         video.src = blobUrl;
 
-        try { video.load?.(); } catch {}
+        try {
+          video.load?.();
+        } catch {}
         log("video load() called with blobUrl");
 
         await drawPoster();
@@ -297,7 +299,7 @@ export default function VideoThumb({
     })();
 
     return cleanup;
-  }, [src, canGen, visible, fileUrl, id]);
+  }, [src, canGen, visible, fileUrl, id, log]);
 
   const safeImgSrc = useMemo(() => {
     if (src && (src.startsWith("data:") || /^https?:\/\//.test(src))) return src;
@@ -362,10 +364,7 @@ function formatDuration(sec?: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function once<T extends keyof HTMLMediaElementEventMap>(
-  v: HTMLVideoElement,
-  name: T
-) {
+function once<T extends keyof HTMLMediaElementEventMap>(v: HTMLVideoElement, name: T) {
   return new Promise<void>((res, rej) => {
     const onOk = () => {
       v.removeEventListener("error", onErr);
@@ -386,7 +385,7 @@ async function waitLoaded(v: HTMLVideoElement, timeoutMs = 8000) {
     once(v, "canplay"),
     (async () => {
       try {
-        await v.play();               // デコードを始めさせる
+        await v.play(); // デコードを始めさせる
         await new Promise((r) => setTimeout(r, 60));
         v.pause();
       } catch {}
