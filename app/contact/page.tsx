@@ -23,6 +23,8 @@ export const metadata = {
         <p className="mb-6 opacity-80">
           お問い合わせは以下のメールアドレスまでご連絡ください。
         </p>
+        <p>広告掲載・提携・掲載リクエスト等についても、以下メール宛にご連絡ください。</p>
+
   
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="mb-2 text-sm opacity-70">メールアドレス</div>

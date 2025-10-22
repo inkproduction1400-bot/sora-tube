@@ -8,8 +8,8 @@ export default function SiteHeader() {
     <header className="sticky top-0 z-20 mx-auto w-full max-w-md bg-gradient-to-b from-black to-transparent px-3 pt-3 pb-2">
       <div className="flex items-center justify-between">
         <Link href="/" className="text-2xl font-extrabold tracking-tight">
-          <span className="text-white">MISS</span>
-          <span className="text-pink-400">AI</span>
+          <span className="text-white">Sora</span>
+          <span className="text-pink-400">Tube</span>
         </Link>
 
         <div className="flex items-center gap-3 text-sm">
