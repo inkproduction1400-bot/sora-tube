@@ -37,14 +37,11 @@ export default async function SwipeCategoryPage({
   params: Promise<{ group: string; slug: string }>;
   searchParams: Promise<{ v?: string }>;
 }) {
-  const { group, slug } = await params;
+  const { slug } = await params;
   const { v: initialId } = await searchParams;
 
-  // group は "job" | "style" 想定。API は tags を category として受けている実装なので
-  // slug をそのまま category= に渡せばOK（API側で tags array-contains を使っている）
+  // API は category=slug で tags array-contains フィルタ
   const videos = await getVideos({ category: slug, limit: "100" });
 
-  return (
-    <SwipeViewer videos={videos} initialId={initialId} />
-  );
+  return <SwipeViewer videos={videos} initialId={initialId ?? undefined} />;
 }

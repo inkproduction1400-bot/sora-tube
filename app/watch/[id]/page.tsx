@@ -2,7 +2,7 @@
 import { headers } from "next/headers";
 import SwipeViewer from "@/components/SwipeViewer";
 
-type Raw = {
+type V = {
   id: string;
   title: string;
   fileUrl: string;
@@ -21,22 +21,21 @@ async function base() {
   return `${proto}://${host}`;
 }
 
-async function getById(id: string): Promise<Raw | null> {
+async function getById(id: string): Promise<V | null> {
   const origin = await base();
   const res = await fetch(`${origin}/api/videos?id=${encodeURIComponent(id)}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
-  const v = (data.videos as Raw[])?.[0];
-  return v ?? null;
+  return (data.videos as V[])?.[0] ?? null;
 }
 
-async function getByCategory(cat?: string): Promise<Raw[]> {
+async function getByCategory(cat?: string): Promise<V[]> {
   const origin = await base();
   const qs = cat ? `?category=${encodeURIComponent(cat)}&limit=100` : "";
   const res = await fetch(`${origin}/api/videos${qs}`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.videos as Raw[]) ?? [];
+  return (data.videos as V[]) ?? [];
 }
 
 export default async function WatchPage({
@@ -46,6 +45,7 @@ export default async function WatchPage({
 }) {
   const { id } = await params;
   const v = await getById(id);
+
   if (!v) {
     return (
       <main className="grid h-[100dvh] place-content-center bg-black text-white">
@@ -53,8 +53,8 @@ export default async function WatchPage({
       </main>
     );
   }
+
   const list = await getByCategory(v.category);
-  // 念のため、同一ID が一覧に無い場合は先頭に差し込む
   const has = list.some((x) => x.id === id);
   const videos = has ? list : [v, ...list];
 
