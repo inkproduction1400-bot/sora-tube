@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import AgeGate from "@/components/AgeGate";
+import { Analytics } from "@vercel/analytics/next"; // ← 追加
 
 // ExoClick などのサイト所有確認（meta name と content を環境変数から）
 const EXO_NAME =
@@ -53,6 +54,9 @@ export default function RootLayout({
             </nav>
           </div>
         </footer>
+
+        {/* Vercel Analytics（全ページ計測） */}
+        <Analytics />
       </body>
     </html>
   );
