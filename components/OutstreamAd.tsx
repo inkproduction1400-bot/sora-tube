@@ -5,18 +5,28 @@ import { useId } from "react";
 
 /**
  * ExoClick Outstream Video（独立プレイヤー形式）
- * 自動再生型のインプレッション報酬向け動画広告
+ * 自動再生のインプレッション型動画広告
  */
 export default function OutstreamAd() {
   const enabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
-  const zoneId = process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM;
+
+  // どちらの環境変数名でも拾えるように
+  const zoneId =
+    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM ||
+    process.env.NEXT_PUBLIC_EXO_OUT_ZONE_ID;
+
+  const outClass =
+    process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM ||
+    process.env.NEXT_PUBLIC_EXO_OUT_CLASS ||
+    "eas6a97888e37"; // Exoの画面で表示されている class
+
   const domId = useId().replace(/:/g, "_");
 
   if (!enabled || !zoneId) return null;
 
   return (
     <div className="relative flex items-center justify-center py-6">
-      {/* 1) ライブラリ読み込み */}
+      {/* 1) ライブラリ */}
       <Script
         id={`magsrv-sdk-${domId}`}
         src="https://a.magsrv.com/ad-provider.js"
@@ -24,10 +34,10 @@ export default function OutstreamAd() {
       />
       {/* 2) ゾーン本体 */}
       <ins
-        className={process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM || "eas6a97888e37"}
+        className={outClass}
         data-zoneid={zoneId}
         style={{ display: "block", width: "100%", maxWidth: 640 }}
-      ></ins>
+      />
       {/* 3) 初期化 */}
       <Script id={`magsrv-init-${domId}`} strategy="afterInteractive">
         {`(window.AdProvider = window.AdProvider || []).push({ serve: {} });`}
