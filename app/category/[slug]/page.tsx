@@ -8,7 +8,7 @@ type V = {
   category: string;
   thumbUrl?: string;
   durationSec?: number;
-  fileUrl: string;          // ← 追加
+  fileUrl: string; // 自動サムネ生成に使用
 };
 
 async function base() {
@@ -41,7 +41,7 @@ export default async function CategoryPage({
   const videos = await getByCategory(slug);
 
   return (
-    <main className="mx-auto max-w-md px-3 py-4 space-y-3">
+    <main className="mx-auto max-w-md space-y-3 px-3 py-4">
       <div className="rounded-xl bg-black/40 px-3 py-2 backdrop-blur-md">
         <div className="text-sm font-semibold">#{slug}</div>
         <div className="text-[11px] opacity-70">該当 {videos.length} 本</div>
@@ -54,11 +54,12 @@ export default async function CategoryPage({
             id={v.id}
             title={v.title}
             category={v.category}
-            thumbUrl={(v.thumbUrl || "").trim() || undefined} // 空文字を除去
+            thumbUrl={(v.thumbUrl || "").trim() || undefined} // 空文字は未設定扱い
             durationSec={v.durationSec}
-            fileUrl={v.fileUrl}          // ← 追加（自動キャプチャ＆キャッシュ用）
+            fileUrl={v.fileUrl} // 自動キャプチャ＆キャッシュ用
           />
         ))}
+
         {videos.length === 0 && (
           <div className="text-sm opacity-70">該当なし</div>
         )}
