@@ -1,9 +1,17 @@
 // components/SwipeViewer.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type TouchEventHandler } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type TouchEventHandler,
+  type WheelEventHandler,
+} from "react";
 import Link from "next/link";
-import OutstreamAd from "@/components/OutstreamAd"; // ← ここを差し替え
+import OutstreamAd from "@/components/OutstreamAd";
 
 type V = {
   id: string;
@@ -63,18 +71,26 @@ export default function SwipeViewer({
   const touchStartY = useRef<number | null>(null);
   const THRESH = 40;
 
-  const toPrev = () => {
-    if (idx > 0) setIdx((v) => v - 1);
-    else bounceOnce("top");
-  };
-  const toNext = () => {
-    if (idx < merged.length - 1) setIdx((v) => v + 1);
-    else bounceOnce("bottom");
-  };
   const bounceOnce = (where: "top" | "bottom") => {
     setBounce(where);
     setTimeout(() => setBounce(null), 180);
   };
+
+  const toPrev = useCallback(() => {
+    setIdx((current) => {
+      if (current > 0) return current - 1;
+      bounceOnce("top");
+      return current;
+    });
+  }, []);
+
+  const toNext = useCallback(() => {
+    setIdx((current) => {
+      if (current < merged.length - 1) return current + 1;
+      bounceOnce("bottom");
+      return current;
+    });
+  }, [merged.length]);
 
   const onTouchStart: TouchEventHandler<HTMLDivElement> = (e) => {
     touchStartY.current = e.touches[0].clientY;
@@ -90,10 +106,11 @@ export default function SwipeViewer({
   };
 
   // マウスホイール・キーボード
-  const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
+  const onWheel: WheelEventHandler<HTMLDivElement> = (e) => {
     if (e.deltaY > 10) toNext();
     else if (e.deltaY < -10) toPrev();
   };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") toPrev();
@@ -101,17 +118,15 @@ export default function SwipeViewer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [toPrev, toNext]);
 
   // 再生コントロール
   const vref = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(true);
-  const [ready, setReady] = useState(false);
 
-  // インデックス変更時：ミュートに戻して準備し直す（広告行では動画処理なし）
+  // インデックス変更時：ミュートに戻す（広告行では動画処理なし）
   useEffect(() => {
     setMuted(true);
-    setReady(false);
   }, [idx]);
 
   // 動画ソースやミュート状態が変わったら再生
@@ -121,7 +136,7 @@ export default function SwipeViewer({
     if (!v) return;
     v.muted = muted;
     v.play().catch(() => {});
-  }, [idx, (curr as V | undefined)?.fileUrl, muted, isAd]);
+  }, [isAd, muted, idx]);
 
   // ---- Hooks はここまでに宣言（以降で条件分岐OK）----
 
@@ -155,7 +170,7 @@ export default function SwipeViewer({
       <div className="pointer-events-auto fixed right-3 top-3 z-20">
         <Link
           href="/"
-          className="rounded-xl bg-white/15 px-3 py-1 text-sm backdrop-blur hover:bg白/25"
+          className="rounded-xl bg-white/15 px-3 py-1 text-sm backdrop-blur hover:bg-white/25"
         >
           TOPへ戻る
         </Link>
@@ -194,7 +209,6 @@ export default function SwipeViewer({
                   autoPlay
                   preload="auto"
                   muted={muted}
-                  onLoadedData={() => setReady(true)}
                 />
                 {/* タイトル */}
                 <div className="absolute bottom-3 left-3 right-3 line-clamp-2 rounded-lg bg-black/35 p-2 text-sm">
