@@ -30,7 +30,7 @@ export default function SwipeViewer({
   const adEnabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
   const freq = Math.max(2, Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "3"));
 
-  // 広告を差し込んだ配列を作成
+  // 広告を差し込んだ配列を作成（順序が安定）
   const merged: Item[] = useMemo(() => {
     if (!adEnabled) return videos;
     const out: Item[] = [];
@@ -56,20 +56,27 @@ export default function SwipeViewer({
   const [idx, setIdx] = useState(startMergedIndex);
   const curr = merged[idx];
   const isAd = !!curr && isAdItem(curr);
+  const currId = !isAd ? (curr as V).id : undefined; // 再生エフェクトの依存簡略化
 
   const [bounce, setBounce] = useState<"top" | "bottom" | null>(null);
 
-  // タッチ/スワイプ
+  // ---- ナビゲーション（スワイプ／ホイール／キー） ----
   const touchStartY = useRef<number | null>(null);
   const THRESH = 40;
 
   const toPrev = () => {
-    if (idx > 0) setIdx(idx - 1);
-    else bounceOnce("top");
+    setIdx((n) => {
+      if (n > 0) return n - 1;
+      bounceOnce("top");
+      return n;
+    });
   };
   const toNext = () => {
-    if (idx < merged.length - 1) setIdx(idx + 1);
-    else bounceOnce("bottom");
+    setIdx((n) => {
+      if (n < merged.length - 1) return n + 1;
+      bounceOnce("bottom");
+      return n;
+    });
   };
   const bounceOnce = (where: "top" | "bottom") => {
     setBounce(where);
@@ -89,29 +96,37 @@ export default function SwipeViewer({
     touchStartY.current = null;
   };
 
-  // マウスホイール・キーボード
   const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
     if (e.deltaY > 10) toNext();
     else if (e.deltaY < -10) toPrev();
   };
+
+  // キーイベント：依存を持たない関数版で ESLint を黙らせる
+  const mergedLenRef = useRef(merged.length);
+  useEffect(() => {
+    mergedLenRef.current = merged.length;
+  }, [merged.length]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp") toPrev();
-      if (e.key === "ArrowDown" || e.key === " ") toNext();
+      if (e.key === "ArrowUp") {
+        setIdx((n) => (n > 0 ? n - 1 : (bounceOnce("top"), n)));
+      }
+      if (e.key === "ArrowDown" || e.key === " ") {
+        setIdx((n) => (n < mergedLenRef.current - 1 ? n + 1 : (bounceOnce("bottom"), n)));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [idx, merged.length]);
+  }, []);
 
-  // 再生コントロール
+  // ---- 再生コントロール ----
   const vref = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(true);
-  const [ready, setReady] = useState(false);
 
-  // インデックス変更時：ミュートに戻して準備し直す（広告行では動画処理なし）
+  // インデックス変更時：ミュートに戻す（広告行では動画処理なし）
   useEffect(() => {
     setMuted(true);
-    setReady(false);
   }, [idx]);
 
   // 動画ソースやミュート状態が変わったら再生
@@ -121,7 +136,7 @@ export default function SwipeViewer({
     if (!v) return;
     v.muted = muted;
     v.play().catch(() => {});
-  }, [idx, (curr as V | undefined)?.fileUrl, muted, isAd]);
+  }, [currId, muted, isAd]);
 
   if (!curr) {
     return (
@@ -176,7 +191,7 @@ export default function SwipeViewer({
       >
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
-            {isAdItem(curr) ? (
+            {isAd ? (
               <AdSlot />
             ) : (
               <>
@@ -190,7 +205,6 @@ export default function SwipeViewer({
                   autoPlay
                   preload="auto"
                   muted={muted}
-                  onLoadedData={() => setReady(true)}
                 />
                 {/* タイトル */}
                 <div className="absolute bottom-3 left-3 right-3 line-clamp-2 rounded-lg bg-black/35 p-2 text-sm">
