@@ -101,7 +101,6 @@ export default function SwipeViewer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // 依存は無し（リスナーはマウント時のみ）
   }, []);
 
   // 再生コントロール
@@ -156,7 +155,7 @@ export default function SwipeViewer({
       <div className="pointer-events-auto fixed right-3 top-3 z-20">
         <Link
           href="/"
-          className="rounded-xl bg-white/15 px-3 py-1 text-sm backdrop-blur hover:bg-white/25"
+          className="rounded-xl bg-white/15 px-3 py-1 text-sm backdrop-blur hover:bg白/25"
         >
           TOPへ戻る
         </Link>
@@ -181,7 +180,7 @@ export default function SwipeViewer({
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
             {isAdItem(curr) ? (
-              // ← 3本おきに Outstream Video を挿入
+              // 3本おきに Outstream Video を挿入
               <OutstreamAd />
             ) : (
               <>
