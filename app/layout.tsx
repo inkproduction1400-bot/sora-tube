@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import AgeGate from "@/components/AgeGate";
-import { Analytics } from "@vercel/analytics/next"; // ← 追加
+import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script"; // ← 追加（SDKを全ページで1回だけ読む）
 
 // ExoClick などのサイト所有確認（meta name と content を環境変数から）
 const EXO_NAME =
@@ -13,7 +14,6 @@ const EXO_TOKEN = process.env.NEXT_PUBLIC_EXO_SITE_VERIFICATION || "";
 export const metadata: Metadata = {
   title: "SoraTube",
   description: "AI縦型ショート動画",
-  // 環境変数が空でも other 自体は問題ありません（空文字は無視されます）
   other: EXO_TOKEN ? { [EXO_NAME]: EXO_TOKEN } : { [EXO_NAME]: "" },
 };
 
@@ -57,6 +57,13 @@ export default function RootLayout({
 
         {/* Vercel Analytics（全ページ計測） */}
         <Analytics />
+
+        {/* ExoClick / MagSrv SDK を全ページで1回だけ読み込む */}
+        <Script
+          id="magsrv-sdk"
+          src="https://a.magsrv.com/ad-provider.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
