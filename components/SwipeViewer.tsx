@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState, type TouchEventHandler } from "react";
 import Link from "next/link";
-import AdSlot from "@/components/AdSlot";
+import OutstreamAd from "@/components/OutstreamAd"; // ← ここを差し替え
 
 type V = {
   id: string;
@@ -101,7 +101,7 @@ export default function SwipeViewer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // idx/merged.length は参照のみなので依存から外しても良い（安定化）
+    // 依存は無し（リスナーはマウント時のみ）
   }, []);
 
   // 再生コントロール
@@ -124,9 +124,9 @@ export default function SwipeViewer({
     v.play().catch(() => {});
   }, [idx, (curr as V | undefined)?.fileUrl, muted, isAd]);
 
-  // ---- Hooks はここまでに宣言しておく（以降で条件分岐OK） ----
+  // ---- Hooks はここまでに宣言（以降で条件分岐OK）----
 
-  // 広告を除いた“何本目/全体”インジケータ（Hooksは早期return前に）
+  // 広告を除いた“何本目/全体”インジケータ
   const videoOrdinal = useMemo(() => {
     let count = 0;
     for (let k = 0; k <= idx; k++) {
@@ -136,7 +136,7 @@ export default function SwipeViewer({
   }, [idx, merged]);
   const totalVideos = videos.length;
 
-  // curr が無い場合のレンダー
+  // curr が無い場合
   if (!curr) {
     return (
       <main className="grid h-[100dvh] place-content-center bg-black text-white">
@@ -181,7 +181,8 @@ export default function SwipeViewer({
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
             {isAdItem(curr) ? (
-              <AdSlot />
+              // ← 3本おきに Outstream Video を挿入
+              <OutstreamAd />
             ) : (
               <>
                 <video

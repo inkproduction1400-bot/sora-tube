@@ -4,6 +4,11 @@ import SiteHeader from "@/components/SiteHeader";
 import CategoryPills from "@/components/CategoryPills";
 import VideoCard from "@/components/VideoCard";
 
+// 追加：固定バナー
+import StickyBottomAd from "@/components/StickyBottomAd";
+// （任意）右上フロートを使う場合はコメントアウトを外す
+// import FloatingTopRightAd from "@/components/FloatingTopRightAd";
+
 type V = {
   id: string;
   title: string;
@@ -145,6 +150,11 @@ export default async function HomePage() {
           </div>
         )}
       </div>
+
+      {/* 固定広告（ページ最下部・常時） */}
+      <StickyBottomAd />
+      {/* 右上フロートを出すなら↓を有効化 */}
+      {/* <FloatingTopRightAd /> */}
     </main>
   );
 }
