@@ -1,3 +1,4 @@
+// components/StickyBottomAd.tsx
 "use client";
 
 import Script from "next/script";
@@ -5,20 +6,19 @@ import { useId } from "react";
 
 export default function StickyBottomAd() {
   const enabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
-  const zoneId = process.env.NEXT_PUBLIC_EXO_ZONE_STICKY_BOTTOM; // 例: "5755608"
+  // 固定バナー用に別ゾーンを使うのがベター
+  const zoneId = process.env.NEXT_PUBLIC_EXO_ZONE_ID_BOTTOM || process.env.NEXT_PUBLIC_EXO_ZONE_ID;
   const domId = useId().replace(/:/g, "_");
 
   if (!enabled || !zoneId) return null;
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-[60] flex justify-center pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto w-full max-w-[1200px]">
-        <div className="mx-auto w-[320px] max-w-[92vw] rounded-t-xl bg-black/70 px-2 pt-2 pb-1 backdrop-blur">
-          {/* 1) SDK */}
+    <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-2">
+      <div className="rounded-lg bg-black/70 px-2 py-2 backdrop-blur">
+        <div id={domId} className="w-[320px] max-w-[92vw]">
+          {/* MagSrv (ExoClick) 推奨の async 3ステップ */}
           <Script id={`magsrv-sdk-${domId}`} src="https://a.magsrv.com/ad-provider.js" strategy="afterInteractive" />
-          {/* 2) ゾーン（class 名は Exo の UI に出た文字列でも OK。class は何でもよいが個別化推奨） */}
-          <ins className="eas-sticky-bottom" data-zoneid={zoneId}></ins>
-          {/* 3) 初期化 */}
+          <ins className="eas6a97888e2" data-zoneid={zoneId}></ins>
           <Script id={`magsrv-init-${domId}`} strategy="afterInteractive">
             {`(window.AdProvider = window.AdProvider || []).push({ serve: {} });`}
           </Script>

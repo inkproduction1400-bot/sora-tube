@@ -1,9 +1,8 @@
 // app/watch/[id]/page.tsx
-import SwipeViewer from "@/components/SwipeViewer";
-import { notFound } from "next/navigation";
 import { headers } from "next/headers";
+import SwipeViewer from "@/components/SwipeViewer";
 
-type V = {
+type Raw = {
   id: string;
   title: string;
   fileUrl: string;
@@ -11,8 +10,6 @@ type V = {
   durationSec?: number;
   category?: string;
 };
-
-const JOB_TAGS = new Set(["nurse", "suits", "caster", "jk", "gal"]);
 
 async function base() {
   const h = await headers();
@@ -24,45 +21,42 @@ async function base() {
   return `${proto}://${host}`;
 }
 
-async function getVideoById(id: string): Promise<V | null> {
+async function getById(id: string): Promise<Raw | null> {
   const origin = await base();
   const res = await fetch(`${origin}/api/videos?id=${encodeURIComponent(id)}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
-  const v = (data?.videos as V[] | undefined)?.[0];
+  const v = (data.videos as Raw[])?.[0];
   return v ?? null;
 }
 
-async function getVideosByCategory(cat: string, limit = 60): Promise<V[]> {
+async function getByCategory(cat?: string): Promise<Raw[]> {
   const origin = await base();
-  const res = await fetch(
-    `${origin}/api/videos?${new URLSearchParams({ category: cat, limit: String(limit) })}`,
-    { cache: "no-store" }
-  );
+  const qs = cat ? `?category=${encodeURIComponent(cat)}&limit=100` : "";
+  const res = await fetch(`${origin}/api/videos${qs}`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data?.videos as V[]) ?? [];
+  return (data.videos as Raw[]) ?? [];
 }
 
-export default async function WatchPage({ params }: { params: { id: string } }) {
-  const current = await getVideoById(params.id);
-  if (!current) return notFound();
-
-  const tag = (current.category || "").trim().toLowerCase();
-  const group = JOB_TAGS.has(tag) ? "job" : "style";
-
-  // 同カテゴリでスワイプ再生（広告は SwipeViewer 側で自動挿入）
-  let list = tag ? await getVideosByCategory(tag, 60) : [current];
-
-  // APIの整列で対象が先頭に来ない場合があるので、存在保障
-  if (!list.find((v) => v.id === current.id)) {
-    list = [current, ...list];
+export default async function WatchPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const v = await getById(id);
+  if (!v) {
+    return (
+      <main className="grid h-[100dvh] place-content-center bg-black text-white">
+        動画が見つかりません
+      </main>
+    );
   }
+  const list = await getByCategory(v.category);
+  // 念のため、同一ID が一覧に無い場合は先頭に差し込む
+  const has = list.some((x) => x.id === id);
+  const videos = has ? list : [v, ...list];
 
-  return (
-    <div className="relative h-[100dvh] w-full bg-black text-white">
-      {/* SwipeViewer: これで3本ごとの広告が効く */}
-      <SwipeViewer videos={list} initialId={current.id} />
-    </div>
-  );
+  return <SwipeViewer videos={videos} initialId={id} />;
 }
