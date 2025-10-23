@@ -30,7 +30,7 @@ export default function SwipeViewer({
   const adEnabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
   const freq = Math.max(2, Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "3"));
 
-  // 広告を差し込んだ配列を作成（順序が安定）
+  // 広告を差し込んだ配列
   const merged: Item[] = useMemo(() => {
     if (!adEnabled) return videos;
     const out: Item[] = [];
@@ -56,27 +56,20 @@ export default function SwipeViewer({
   const [idx, setIdx] = useState(startMergedIndex);
   const curr = merged[idx];
   const isAd = !!curr && isAdItem(curr);
-  const currId = !isAd ? (curr as V).id : undefined; // 再生エフェクトの依存簡略化
 
   const [bounce, setBounce] = useState<"top" | "bottom" | null>(null);
 
-  // ---- ナビゲーション（スワイプ／ホイール／キー） ----
+  // タッチ/スワイプ
   const touchStartY = useRef<number | null>(null);
   const THRESH = 40;
 
   const toPrev = () => {
-    setIdx((n) => {
-      if (n > 0) return n - 1;
-      bounceOnce("top");
-      return n;
-    });
+    if (idx > 0) setIdx((v) => v - 1);
+    else bounceOnce("top");
   };
   const toNext = () => {
-    setIdx((n) => {
-      if (n < merged.length - 1) return n + 1;
-      bounceOnce("bottom");
-      return n;
-    });
+    if (idx < merged.length - 1) setIdx((v) => v + 1);
+    else bounceOnce("bottom");
   };
   const bounceOnce = (where: "top" | "bottom") => {
     setBounce(where);
@@ -96,37 +89,30 @@ export default function SwipeViewer({
     touchStartY.current = null;
   };
 
+  // マウスホイール・キーボード
   const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
     if (e.deltaY > 10) toNext();
     else if (e.deltaY < -10) toPrev();
   };
-
-  // キーイベント：依存を持たない関数版で ESLint を黙らせる
-  const mergedLenRef = useRef(merged.length);
-  useEffect(() => {
-    mergedLenRef.current = merged.length;
-  }, [merged.length]);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowUp") {
-        setIdx((n) => (n > 0 ? n - 1 : (bounceOnce("top"), n)));
-      }
-      if (e.key === "ArrowDown" || e.key === " ") {
-        setIdx((n) => (n < mergedLenRef.current - 1 ? n + 1 : (bounceOnce("bottom"), n)));
-      }
+      if (e.key === "ArrowUp") toPrev();
+      if (e.key === "ArrowDown" || e.key === " ") toNext();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // idx/merged.length は参照のみなので依存から外しても良い（安定化）
   }, []);
 
-  // ---- 再生コントロール ----
+  // 再生コントロール
   const vref = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(true);
+  const [ready, setReady] = useState(false);
 
-  // インデックス変更時：ミュートに戻す（広告行では動画処理なし）
+  // インデックス変更時：ミュートに戻して準備し直す（広告行では動画処理なし）
   useEffect(() => {
     setMuted(true);
+    setReady(false);
   }, [idx]);
 
   // 動画ソースやミュート状態が変わったら再生
@@ -136,17 +122,11 @@ export default function SwipeViewer({
     if (!v) return;
     v.muted = muted;
     v.play().catch(() => {});
-  }, [currId, muted, isAd]);
+  }, [idx, (curr as V | undefined)?.fileUrl, muted, isAd]);
 
-  if (!curr) {
-    return (
-      <main className="grid h-[100dvh] place-content-center bg-black text-white">
-        このカテゴリには動画がありません
-      </main>
-    );
-  }
+  // ---- Hooks はここまでに宣言しておく（以降で条件分岐OK） ----
 
-  // 広告を除いた“何本目/全体”インジケータ
+  // 広告を除いた“何本目/全体”インジケータ（Hooksは早期return前に）
   const videoOrdinal = useMemo(() => {
     let count = 0;
     for (let k = 0; k <= idx; k++) {
@@ -155,6 +135,15 @@ export default function SwipeViewer({
     return count;
   }, [idx, merged]);
   const totalVideos = videos.length;
+
+  // curr が無い場合のレンダー
+  if (!curr) {
+    return (
+      <main className="grid h-[100dvh] place-content-center bg-black text-white">
+        このカテゴリには動画がありません
+      </main>
+    );
+  }
 
   return (
     <main
@@ -191,7 +180,7 @@ export default function SwipeViewer({
       >
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
-            {isAd ? (
+            {isAdItem(curr) ? (
               <AdSlot />
             ) : (
               <>
@@ -205,6 +194,7 @@ export default function SwipeViewer({
                   autoPlay
                   preload="auto"
                   muted={muted}
+                  onLoadedData={() => setReady(true)}
                 />
                 {/* タイトル */}
                 <div className="absolute bottom-3 left-3 right-3 line-clamp-2 rounded-lg bg-black/35 p-2 text-sm">
