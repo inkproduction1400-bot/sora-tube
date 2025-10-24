@@ -3,7 +3,6 @@
 
 import Script from "next/script";
 import { useEffect, useId, useRef, useState } from "react";
-import clsx from "clsx";
 
 type Props = {
   id?: string;
@@ -83,10 +82,14 @@ export default function FeedAd({
     return null;
   }
 
+  // clsx を使わずシンプル連結
+  const wrapClass =
+    ["w-full", className].filter(Boolean).join(" ");
+
   return (
     <div
       ref={wrapRef}
-      className={clsx("w-full", className)}
+      className={wrapClass}
       style={{ aspectRatio, position: "relative" }}
       aria-label="in-feed-ad"
       data-ad-id={id}
