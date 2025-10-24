@@ -6,17 +6,24 @@ import { useEffect, useId, useRef, useState } from "react";
 
 /**
  * SwipeViewer に差し込む Outstream 広告（デバッグ強化版）
- * - まずは “必ずマウント” して SDK / タグを即初期化（Lazyは一旦オフ）
- * - minHeight / z-index / display:block など見え方の落とし穴を回避
- * - 4s ポーリングで <ins> 配下に iframe 生えたか検知 → だめなら "No fill" を明示
+ * - Hooks は無条件で先頭に呼び出し（rules-of-hooks 準拠）
+ * - display:block / minHeight を強制して“見えない”問題を回避
+ * - 4s ポーリングで iframe 生成を検知 → 無ければ No fill 表示
  */
 export default function OutstreamAd({
-  minHeight = 220, // ゾーンが 300x250/320x50 でも最低これくらい確保
+  minHeight = 220,
   nofillTimeoutMs = 4000,
 }: {
   minHeight?: number;
   nofillTimeoutMs?: number;
 }) {
+  // ★ Hooks はコンポーネント先頭で無条件に呼ぶ
+  const domId = useId().replace(/:/g, "_");
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+  const [filled, setFilled] = useState<null | boolean>(null); // null=未判定
+
+  // 環境変数の読み出し（ここは Hooks ではないので OK）
   const enabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
   const outClass =
     process.env.NEXT_PUBLIC_EXO_OUTSTREAM_CLASS ||
@@ -25,29 +32,34 @@ export default function OutstreamAd({
     process.env.NEXT_PUBLIC_EXO_OUTSTREAM_ZONE_ID ||
     process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM;
 
-  const domId = useId().replace(/:/g, "_");
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const insRef = useRef<HTMLDivElement | null>(null);
-
-  const [sdkLoaded, setSdkLoaded] = useState(false);
-  const [pushed, setPushed] = useState(false);
-  const [filled, setFilled] = useState<null | boolean>(null); // null=未判定 / true=表示 / false=ノーフィル
-
-  // 1) 事前ガード
-  if (!enabled || !zoneId || !outClass) {
-    return null;
-  }
-
-  // 2) ノーフィル判定（ins 配下に iframe がいるか）
+  // マウント時のデバッグログ
   useEffect(() => {
-    if (!wrapRef.current) return;
+    // 1 回だけ
+    console.info("[OutstreamAd] mount", {
+      enabled,
+      outClass,
+      zoneId,
+      domId,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // SDK 初期化後に <iframe> が生えたかをポーリング
+  useEffect(() => {
+    if (!enabled || !zoneId || !outClass) return;
 
     let tries = 0;
-    const tick = () => {
+    let stop = false;
+
+    const check = () => {
+      if (stop) return;
       tries++;
-      const root = wrapRef.current!;
-      const ifr = root.querySelector("iframe, ins iframe") as HTMLIFrameElement | null;
-      if (ifr) {
+      const root = wrapRef.current;
+      const iframe = root?.querySelector("iframe, ins iframe") as
+        | HTMLIFrameElement
+        | null;
+
+      if (iframe) {
         setFilled(true);
         return;
       }
@@ -55,35 +67,27 @@ export default function OutstreamAd({
         setFilled(false);
         return;
       }
-      setTimeout(tick, 200);
+      setTimeout(check, 200);
     };
 
-    // SDK init 後にチェック開始
-    const t = setTimeout(tick, 400);
-    return () => clearTimeout(t);
-  }, [sdkLoaded, pushed, nofillTimeoutMs]);
+    // SDK onLoad 直後だけだとタイミングがシビアなので少し遅延して開始
+    const t = setTimeout(check, 400);
+    return () => {
+      clearTimeout(t);
+      stop = true;
+    };
+  }, [enabled, zoneId, outClass, nofillTimeoutMs]);
 
-  // 3) デバッグログ（Vercel /watch で追えるように）
-  useEffect(() => {
-    // 1 回だけ
-    // eslint-disable-next-line no-console
-    console.info("[OutstreamAd] mount", {
-      outClass,
-      zoneId,
-      enabled,
-      domId,
-    });
-  }, [outClass, zoneId, enabled, domId]);
+  // ---- ここから描画分岐（Hooks の後）----
+  if (!enabled || !zoneId || !outClass) {
+    return null;
+  }
 
   return (
     <div
       ref={wrapRef}
       className="mx-auto flex w-full max-w-[560px] items-center justify-center rounded-2xl bg-black/80"
-      style={{
-        minHeight,
-        position: "relative",
-        zIndex: 1,
-      }}
+      style={{ minHeight, position: "relative", zIndex: 1 }}
       data-qa="outstream-ad"
     >
       {/* SDK */}
@@ -93,21 +97,16 @@ export default function OutstreamAd({
         strategy="afterInteractive"
         onLoad={() => {
           setSdkLoaded(true);
-          // eslint-disable-next-line no-console
           console.info("[OutstreamAd] SDK loaded");
         }}
       />
 
-      {/* ゾーンタグ：display:block を強制、サイズ交渉しやすく */}
-      <div id={domId} ref={insRef} className="w-full">
+      {/* ゾーンタグ（確実に表示交渉できるよう block/width/minHeight） */}
+      <div id={domId} className="w-full">
         <ins
           className={outClass}
           data-zoneid={zoneId}
-          style={{
-            display: "block",
-            width: "100%",
-            minHeight,
-          }}
+          style={{ display: "block", width: "100%", minHeight }}
         />
       </div>
 
@@ -124,8 +123,8 @@ export default function OutstreamAd({
         `}
       </Script>
 
-      {/* ステータス表示（デバッグ時のみ視覚化） */}
-      {filled === false && (
+      {/* デバッグ用オーバーレイ（ノーフィル時） */}
+      {sdkLoaded && filled === false && (
         <div className="pointer-events-none absolute inset-0 grid place-content-center text-xs text-white/70">
           <div className="rounded-md border border-white/20 bg-white/5 px-3 py-2">
             No fill (zone:{zoneId})
