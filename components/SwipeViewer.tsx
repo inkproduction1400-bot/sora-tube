@@ -38,9 +38,16 @@ export default function SwipeViewer({
   adEvery?: number;
 }) {
   // --- 広告の有効化と頻度 ---
-  const adEnabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
-  const envFreq = Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "3");
-  const freqRaw = typeof adEvery === "number" ? adEvery : envFreq;
+  // 未設定なら true 扱い（"false" のときだけ無効）
+  const adEnabled =
+    (process.env.NEXT_PUBLIC_AD_ENABLED ?? "true").toLowerCase() !== "false";
+
+  const envFreq =
+    process.env.NEXT_PUBLIC_EXO_FREQUENCY ??
+    process.env.NEXT_PUBLIC_AD_FREQUENCY ?? // 旧名フォールバック
+    "3";
+
+  const freqRaw = typeof adEvery === "number" ? adEvery : Number(envFreq);
   const freq = Number.isFinite(freqRaw) ? Math.floor(freqRaw) : 3; // NaN ガード
   const useAds = adEnabled && freq > 0; // freq <= 0 なら広告なし
 

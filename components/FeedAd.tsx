@@ -22,9 +22,11 @@ export default function FeedAd({
   aspectRatio = "16 / 9",
   nofillTimeoutMs = 4000,
 }: Props) {
-  const enabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
+  // 未設定なら true 扱い（"false" のときだけ無効）
+  const enabled =
+    (process.env.NEXT_PUBLIC_AD_ENABLED ?? "true").toLowerCase() !== "false";
 
-  // ▼ Outstream 用ゾーン（ExoClick/MagSrv 管理画面の Asynchronous Script にある class と zone id）
+  // ▼ Outstream 用ゾーン（新旧ENVに対応）
   const outClass =
     process.env.NEXT_PUBLIC_EXO_OUTSTREAM_CLASS ||
     process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM; // 互換
@@ -83,8 +85,7 @@ export default function FeedAd({
   }
 
   // clsx を使わずシンプル連結
-  const wrapClass =
-    ["w-full", className].filter(Boolean).join(" ");
+  const wrapClass = ["w-full", className].filter(Boolean).join(" ");
 
   return (
     <div
