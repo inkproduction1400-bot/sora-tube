@@ -50,7 +50,6 @@ type Shaped = {
 /* =========================
    Supabase公開URLの補完ヘルパ
    ========================= */
-
 function buildPublicUrl(rawUrl?: string, rawPath?: string) {
   const url = nz(rawUrl);
   if (url) return url;
@@ -135,7 +134,6 @@ function parsePublishedAt(val: unknown): Date | undefined {
     const d = new Date(val);
     return isNaN(d.getTime()) ? undefined : d;
   }
-  // Firestore Timestamp はここでは触らず undefined を返してスキップ
   return undefined;
 }
 
@@ -145,14 +143,14 @@ function parsePublishedAt(val: unknown): Date | undefined {
    - /api/videos?src=category&slug=xxx   … カテゴリ（or タグ同名）絞り込み
    - /api/videos?src=tag&slug=xxx        … タグ絞り込み（tags array-contains）
    - /api/videos?src=section&key=xxx     … セクション（recommended=ランダム / latest=新着順）
-   - /api/videos?src=search&q=xxx        … 簡易検索（クライアント側フィルタ）
+   - /api/videos?src=search&q=xxx        … 簡易検索（タイトル/カテゴリ）
    - 互換: /api/videos?category=xxx      … 旧パラメータも維持
    ========================= */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
 
-    // 互換: /api/videos?id=...（単体）
+    // 単体取得
     const id = searchParams.get("id") ?? undefined;
     if (id) {
       const snap = await getDoc(doc(db, "videos", id));
@@ -169,7 +167,7 @@ export async function GET(req: Request) {
       );
     }
 
-    // 新方式
+    // 新方式パラメータ
     const src = (searchParams.get("src") ?? undefined) as
       | "category"
       | "tag"
@@ -181,7 +179,7 @@ export async function GET(req: Request) {
     const key = nz(searchParams.get("key") ?? undefined);
     const q = nz(searchParams.get("q") ?? undefined);
 
-    // 旧互換: ?category=xxx が来たら src=category 扱い
+    // 旧互換
     const legacyCategory = nz(searchParams.get("category") ?? undefined);
     const effectiveSrc = src ?? (legacyCategory ? "category" : undefined);
     const effectiveSlug = slug ?? legacyCategory;
@@ -200,7 +198,6 @@ export async function GET(req: Request) {
       qlimit(lim),
     ];
 
-    // Firestore の制約に配慮しつつ、各系統を分岐
     async function run(qc: QueryConstraint[]): Promise<Shaped[]> {
       const qy = query(ref, ...qc);
       const snap = await getDocs(qy);
@@ -216,16 +213,15 @@ export async function GET(req: Request) {
           { status: 400, headers: { "Cache-Control": "no-store" } },
         );
       }
-      // 優先: tags array-contains で slug ヒット
+      // 1st: tags contains
       result = await run([
         where("published", "==", true),
         where("tags", "array-contains", effectiveSlug),
         orderBy("publishedAt", "desc"),
         qlimit(lim),
       ]);
-
-      // フォールバック: category===slug で補完（array-contains が 0 件時）
-      if (result.length === 0) {
+      // fallback: category === slug
+     	if (result.length === 0) {
         result = await run([
           where("published", "==", true),
           where("category", "==", effectiveSlug),
@@ -240,7 +236,6 @@ export async function GET(req: Request) {
           { status: 400, headers: { "Cache-Control": "no-store" } },
         );
       }
-      // タグは array-contains 一択
       result = await run([
         where("published", "==", true),
         where("tags", "array-contains", effectiveSlug),
@@ -255,32 +250,28 @@ export async function GET(req: Request) {
         );
       }
 
-      // ★ セクション定義
-      // - recommended: 直近の公開動画からランダム抽出（シャッフル）
-      // - latest / recent: 新着順（publishedAt 降順）
-      // - trending: ここでは新着順（将来 viewCount ソート等に差し替え可）
+      // セクション定義
       if (key === "recommended") {
-        const take = Math.min(200, Math.max(lim * 4, lim)); // 上限200件・limitの4倍目安
+        // 直近の公開動画（最大200件）を取得 → シャッフル → limit
+        const take = Math.min(200, Math.max(lim * 4, lim));
         const recent = await run([
           where("published", "==", true),
           orderBy("publishedAt", "desc"),
           qlimit(take),
         ]);
-
-        // Fisher–Yates シャッフル
         for (let i = recent.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [recent[i], recent[j]] = [recent[j], recent[i]];
         }
         result = recent.slice(0, lim);
       } else if (key === "latest" || key === "recent" || key === "trending") {
+        // 新着順（将来 trending はソート変更可）
         result = await run([
           where("published", "==", true),
           orderBy("publishedAt", "desc"),
           qlimit(lim),
         ]);
       } else {
-        // 未知キーは安全に空配列
         result = [];
       }
     } else if (effectiveSrc === "search") {
@@ -290,7 +281,6 @@ export async function GET(req: Request) {
           { status: 400, headers: { "Cache-Control": "no-store" } },
         );
       }
-      // 簡易全文: 直近 lim*4 件を取得 → タイトル/カテゴリに対して contains
       const recent = await run([
         where("published", "==", true),
         orderBy("publishedAt", "desc"),
@@ -305,7 +295,7 @@ export async function GET(req: Request) {
         })
         .slice(0, lim);
     } else {
-      // src 未指定 → 旧互換: 全体の最新を返す
+      // src 未指定 → 最新
       result = await run(base);
     }
 
@@ -365,7 +355,6 @@ export async function PUT(req: Request) {
     }
 
     const ref = doc(db, "videos", id);
-    // ← ここを updateDoc ではなく setDoc(merge) に
     await setDoc(ref, patch as Record<string, unknown>, { merge: true });
 
     const snap = await getDoc(ref);
