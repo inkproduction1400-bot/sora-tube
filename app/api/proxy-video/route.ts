@@ -30,9 +30,7 @@ export async function GET(req: Request) {
     const upstream = await fetch(u, {
       // 既存の Range ヘッダが来ていれば尊重、なければ先頭 1MB
       headers: {
-        Range:
-          req.headers.get("range") ??
-          "bytes=0-1048575", // 1MB (= 1024 * 1024 - 1)
+        Range: req.headers.get("range") ?? "bytes=0-1048575", // 1MB (= 1024 * 1024 - 1)
       },
       // キャッシュ可：CDN/ブラウザで再利用させる
       cache: "no-store",
@@ -57,7 +55,7 @@ export async function GET(req: Request) {
     if (!safeHeaders.has("Cache-Control")) {
       safeHeaders.set(
         "Cache-Control",
-        "public, s-maxage=86400, stale-while-revalidate=604800"
+        "public, s-maxage=86400, stale-while-revalidate=604800",
       );
     }
 
@@ -67,6 +65,9 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     console.error("[proxy-video] error", e);
-    return NextResponse.json({ error: "proxy failed" }, { status: 502, headers: CORS_HEADERS });
+    return NextResponse.json(
+      { error: "proxy failed" },
+      { status: 502, headers: CORS_HEADERS },
+    );
   }
 }

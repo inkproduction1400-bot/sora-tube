@@ -30,24 +30,32 @@ const isAdItem = (x: Item): x is AdItem => (x as AdItem).__ad === true;
 export default function SwipeViewer({
   videos,
   initialId,
+  /** 例: 3 を渡すと 3 本ごとに広告を差し込む。未指定なら環境変数、なければ 3。0/負数なら差し込みなし */
+  adEvery,
 }: {
   videos: V[];
   initialId?: string;
+  adEvery?: number;
 }) {
   // --- 広告の有効化と頻度 ---
   const adEnabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
-  const freq = Math.max(2, Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "3"));
+  const envFreq = Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "3");
+  const freqRaw = typeof adEvery === "number" ? adEvery : envFreq;
+  const freq = Number.isFinite(freqRaw) ? Math.floor(freqRaw) : 3; // NaN ガード
+  const useAds = adEnabled && freq > 0; // freq <= 0 なら広告なし
 
   // 広告を差し込んだ配列
   const merged: Item[] = useMemo(() => {
-    if (!adEnabled) return videos;
+    if (!useAds) return videos;
+    const f = Math.max(1, freq); // 念のため最小 1
     const out: Item[] = [];
     videos.forEach((v, idx) => {
-      if (idx > 0 && idx % freq === 0) out.push({ __ad: true, key: `ad-${idx}` });
+      // 先頭の直前では挿入しない：idx > 0 のときのみチェック
+      if (idx > 0 && idx % f === 0) out.push({ __ad: true, key: `ad-${idx}` });
       out.push(v);
     });
     return out;
-  }, [videos, adEnabled, freq]);
+  }, [videos, useAds, freq]);
 
   // initialId を merged のインデックスへ変換
   const startMergedIndex = useMemo(() => {
@@ -56,12 +64,21 @@ export default function SwipeViewer({
       const i = videos.findIndex((v) => v.id === initialId);
       return i >= 0 ? i : 0;
     })();
-    if (!adEnabled) return pureIdx;
-    const adCountBefore = Math.floor(pureIdx / freq);
-    return Math.max(0, Math.min(merged.length - 1, pureIdx + adCountBefore));
-  }, [initialId, videos, adEnabled, freq, merged.length]);
 
+    if (!useAds) return pureIdx;
+
+    // pureIdx の手前に挿入された広告個数 = floor(pureIdx / freq)
+    const adCountBefore = Math.floor(pureIdx / Math.max(1, freq));
+    const idxWithAds = pureIdx + adCountBefore;
+    return Math.max(0, Math.min(merged.length - 1, idxWithAds));
+  }, [initialId, videos, useAds, freq, merged.length]);
+
+  // idx は videos/initialId 変化時に再同期
   const [idx, setIdx] = useState(startMergedIndex);
+  useEffect(() => {
+    setIdx(startMergedIndex);
+  }, [startMergedIndex]);
+
   const curr = merged[idx];
   const isAd = !!curr && isAdItem(curr);
 
@@ -195,7 +212,7 @@ export default function SwipeViewer({
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
             {isAdItem(curr) ? (
-              // 3本おきに Outstream Video を挿入
+              // n本おきに Outstream Video を挿入（1スクリーンに1枠のみ）
               <OutstreamAd />
             ) : (
               <>

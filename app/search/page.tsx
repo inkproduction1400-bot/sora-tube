@@ -42,7 +42,7 @@ export default async function SearchPage({
     undefined;
 
   const videos = await getVideos(
-    category ? { category, limit: "50" } : { limit: "50" }
+    category ? { category, limit: "50" } : { limit: "50" },
   );
 
   return (

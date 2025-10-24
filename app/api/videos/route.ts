@@ -31,7 +31,7 @@ type Raw = {
   publishedAt?: unknown;
 
   /** ▼ 追加: ネイティブ広告等の識別・遷移先 ▼ */
-  type?: string;      // 'video' | 'ad'（省略時は 'video' として扱う）
+  type?: string; // 'video' | 'ad'（省略時は 'video' として扱う）
   targetUrl?: string; // type==='ad' のときの遷移先
 };
 
@@ -43,7 +43,7 @@ type Shaped = {
   durationSec?: number;
   fileUrl?: string;
   /** 広告用 */
-  type: string;       // 'video' | 'ad'
+  type: string; // 'video' | 'ad'
   targetUrl?: string;
 };
 
@@ -86,7 +86,16 @@ function shape(id: string, v: Raw): Shaped {
   const type = nz(v.type) ?? "video";
   const targetUrl = nz(v.targetUrl);
 
-  return { id, title, category, thumbUrl, durationSec, fileUrl, type, targetUrl };
+  return {
+    id,
+    title,
+    category,
+    thumbUrl,
+    durationSec,
+    fileUrl,
+    type,
+    targetUrl,
+  };
 }
 
 /* =========================
@@ -101,9 +110,21 @@ function checkAdminKey(req: Request) {
 
 function normalizeTags(val: unknown): string[] | undefined {
   if (val === undefined || val === null) return undefined;
-  const arr = Array.isArray(val) ? val : typeof val === "string" ? val.split(/[,\s]+/) : [];
+  const arr = Array.isArray(val)
+    ? val
+    : typeof val === "string"
+      ? val.split(/[,\s]+/)
+      : [];
   const out = Array.from(
-    new Set(arr.map((t) => String(t ?? "").trim().toLowerCase()).filter(Boolean))
+    new Set(
+      arr
+        .map((t) =>
+          String(t ?? "")
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    ),
   ).slice(0, 20);
   return out;
 }
@@ -119,13 +140,51 @@ function parsePublishedAt(val: unknown): Date | undefined {
 }
 
 /* =========================
-   GET
+   GET（4系統: category / tag / section / search）
+   - /api/videos?id=xxxx                 … 互換: 単体取得
+   - /api/videos?src=category&slug=xxx   … カテゴリ（or タグ同名）絞り込み
+   - /api/videos?src=tag&slug=xxx        … タグ絞り込み（tags array-contains）
+   - /api/videos?src=section&key=xxx     … セクション（recommended=ランダム / latest=新着順）
+   - /api/videos?src=search&q=xxx        … 簡易検索（クライアント側フィルタ）
+   - 互換: /api/videos?category=xxx      … 旧パラメータも維持
    ========================= */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+
+    // 互換: /api/videos?id=...（単体）
     const id = searchParams.get("id") ?? undefined;
-    const category = nz(searchParams.get("category") ?? undefined);
+    if (id) {
+      const snap = await getDoc(doc(db, "videos", id));
+      if (!snap.exists()) {
+        return NextResponse.json(
+          { videos: [] },
+          { status: 200, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      const v = snap.data() as Raw;
+      return NextResponse.json(
+        { videos: [shape(snap.id, v)] },
+        { status: 200, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    // 新方式
+    const src = (searchParams.get("src") ?? undefined) as
+      | "category"
+      | "tag"
+      | "section"
+      | "search"
+      | undefined;
+
+    const slug = nz(searchParams.get("slug") ?? undefined);
+    const key = nz(searchParams.get("key") ?? undefined);
+    const q = nz(searchParams.get("q") ?? undefined);
+
+    // 旧互換: ?category=xxx が来たら src=category 扱い
+    const legacyCategory = nz(searchParams.get("category") ?? undefined);
+    const effectiveSrc = src ?? (legacyCategory ? "category" : undefined);
+    const effectiveSlug = slug ?? legacyCategory;
 
     const limitParam = Number(searchParams.get("limit") ?? "24");
     const lim =
@@ -133,34 +192,127 @@ export async function GET(req: Request) {
         ? Math.min(100, Math.max(1, Math.floor(limitParam)))
         : 24;
 
-    if (id) {
-      const snap = await getDoc(doc(db, "videos", id));
-      if (!snap.exists()) {
-        return NextResponse.json({ videos: [] }, { status: 200, headers: { "Cache-Control": "no-store" } });
-      }
-      const v = snap.data() as Raw;
-      return NextResponse.json({ videos: [shape(snap.id, v)] }, { status: 200, headers: { "Cache-Control": "no-store" } });
-    }
-
+    // ベースクエリ
     const ref = collection(db, "videos");
-    const constraints: QueryConstraint[] = [
+    const base: QueryConstraint[] = [
       where("published", "==", true),
       orderBy("publishedAt", "desc"),
       qlimit(lim),
     ];
 
-    if (category) {
-      const pseudoTabs = new Set(["recommended", "latest", "recent"]);
-      if (!pseudoTabs.has(category)) {
-        constraints.unshift(where("tags", "array-contains", category));
-      }
+    // Firestore の制約に配慮しつつ、各系統を分岐
+    async function run(qc: QueryConstraint[]): Promise<Shaped[]> {
+      const qy = query(ref, ...qc);
+      const snap = await getDocs(qy);
+      return snap.docs.map((d) => shape(d.id, d.data() as Raw));
     }
 
-    const qy = query(ref, ...constraints);
-    const snap = await getDocs(qy);
-    const data = snap.docs.map((d) => shape(d.id, d.data() as Raw));
+    let result: Shaped[] = [];
 
-    return NextResponse.json({ videos: data }, { status: 200, headers: { "Cache-Control": "no-store" } });
+    if (effectiveSrc === "category") {
+      if (!effectiveSlug) {
+        return NextResponse.json(
+          { error: "missing slug" },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      // 優先: tags array-contains で slug ヒット
+      result = await run([
+        where("published", "==", true),
+        where("tags", "array-contains", effectiveSlug),
+        orderBy("publishedAt", "desc"),
+        qlimit(lim),
+      ]);
+
+      // フォールバック: category===slug で補完（array-contains が 0 件時）
+      if (result.length === 0) {
+        result = await run([
+          where("published", "==", true),
+          where("category", "==", effectiveSlug),
+          orderBy("publishedAt", "desc"),
+          qlimit(lim),
+        ]);
+      }
+    } else if (effectiveSrc === "tag") {
+      if (!effectiveSlug) {
+        return NextResponse.json(
+          { error: "missing slug" },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      // タグは array-contains 一択
+      result = await run([
+        where("published", "==", true),
+        where("tags", "array-contains", effectiveSlug),
+        orderBy("publishedAt", "desc"),
+        qlimit(lim),
+      ]);
+    } else if (effectiveSrc === "section") {
+      if (!key) {
+        return NextResponse.json(
+          { error: "missing key" },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+
+      // ★ セクション定義
+      // - recommended: 直近の公開動画からランダム抽出（シャッフル）
+      // - latest / recent: 新着順（publishedAt 降順）
+      // - trending: ここでは新着順（将来 viewCount ソート等に差し替え可）
+      if (key === "recommended") {
+        const take = Math.min(200, Math.max(lim * 4, lim)); // 上限200件・limitの4倍目安
+        const recent = await run([
+          where("published", "==", true),
+          orderBy("publishedAt", "desc"),
+          qlimit(take),
+        ]);
+
+        // Fisher–Yates シャッフル
+        for (let i = recent.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [recent[i], recent[j]] = [recent[j], recent[i]];
+        }
+        result = recent.slice(0, lim);
+      } else if (key === "latest" || key === "recent" || key === "trending") {
+        result = await run([
+          where("published", "==", true),
+          orderBy("publishedAt", "desc"),
+          qlimit(lim),
+        ]);
+      } else {
+        // 未知キーは安全に空配列
+        result = [];
+      }
+    } else if (effectiveSrc === "search") {
+      if (!q) {
+        return NextResponse.json(
+          { error: "missing q" },
+          { status: 400, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      // 簡易全文: 直近 lim*4 件を取得 → タイトル/カテゴリに対して contains
+      const recent = await run([
+        where("published", "==", true),
+        orderBy("publishedAt", "desc"),
+        qlimit(Math.min(200, lim * 4)),
+      ]);
+      const needle = q.toLowerCase();
+      result = recent
+        .filter((v) => {
+          const titleHit = (v.title || "").toLowerCase().includes(needle);
+          const catHit = (v.category || "").toLowerCase().includes(needle);
+          return titleHit || catHit;
+        })
+        .slice(0, lim);
+    } else {
+      // src 未指定 → 旧互換: 全体の最新を返す
+      result = await run(base);
+    }
+
+    return NextResponse.json(
+      { videos: result },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (err) {
     console.error("GET /api/videos error:", err);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
@@ -172,26 +324,37 @@ export async function GET(req: Request) {
    ========================= */
 export async function PUT(req: Request) {
   try {
-    if (!checkAdminKey(req)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    if (!checkAdminKey(req))
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
-    const body = (await req.json().catch(() => ({}))) as Partial<Raw> & { id?: string };
+    const body = (await req.json().catch(() => ({}))) as Partial<Raw> & {
+      id?: string;
+    };
     const id = body.id || new URL(req.url).searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "id_required" }, { status: 400 });
+    if (!id)
+      return NextResponse.json({ error: "id_required" }, { status: 400 });
 
     const patch: Partial<Raw> & { publishedAt?: Date } = {};
     if (typeof body.title === "string") patch.title = body.title.trim();
     if (typeof body.fileUrl === "string") patch.fileUrl = body.fileUrl.trim();
-    if (typeof body.filePath === "string") patch.filePath = body.filePath.trim();
-    if (typeof body.thumbUrl === "string") patch.thumbUrl = body.thumbUrl.trim();
-    if (typeof body.category === "string") patch.category = body.category.trim();
-    if (typeof body.durationSec === "number" && isFinite(body.durationSec)) patch.durationSec = Math.floor(body.durationSec);
+    if (typeof body.filePath === "string")
+      patch.filePath = body.filePath.trim();
+    if (typeof body.thumbUrl === "string")
+      patch.thumbUrl = body.thumbUrl.trim();
+    if (typeof body.category === "string")
+      patch.category = body.category.trim();
+    if (typeof body.durationSec === "number" && isFinite(body.durationSec))
+      patch.durationSec = Math.floor(body.durationSec);
     if (typeof body.published === "boolean") patch.published = body.published;
 
     // 広告用
     if (typeof body.type === "string") patch.type = body.type.trim();
-    if (typeof body.targetUrl === "string") patch.targetUrl = body.targetUrl.trim();
+    if (typeof body.targetUrl === "string")
+      patch.targetUrl = body.targetUrl.trim();
 
-    const pa = parsePublishedAt((body as { publishedAt?: unknown }).publishedAt);
+    const pa = parsePublishedAt(
+      (body as { publishedAt?: unknown }).publishedAt,
+    );
     if (pa) patch.publishedAt = pa;
 
     const tags = normalizeTags(body.tags);
@@ -207,7 +370,10 @@ export async function PUT(req: Request) {
 
     const snap = await getDoc(ref);
     const v = snap.data() as Raw;
-    return NextResponse.json({ ok: true, video: shape(snap.id, v) }, { status: 200, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { ok: true, video: shape(snap.id, v) },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (err) {
     console.error("PUT /api/videos error:", err);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
@@ -219,7 +385,8 @@ export async function PUT(req: Request) {
    ========================= */
 export async function POST(req: Request) {
   try {
-    if (!checkAdminKey(req)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    if (!checkAdminKey(req))
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
     const body = (await req.json().catch(() => ({}))) as Partial<Raw> & {
       id?: string;
@@ -229,10 +396,14 @@ export async function POST(req: Request) {
 
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const fileUrl = typeof body.fileUrl === "string" ? body.fileUrl.trim() : "";
-    const filePath = typeof body.filePath === "string" ? body.filePath.trim() : "";
+    const filePath =
+      typeof body.filePath === "string" ? body.filePath.trim() : "";
 
     if (!title || (!fileUrl && !filePath)) {
-      return NextResponse.json({ error: "title_and_(fileUrl_or_filePath)_required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "title_and_(fileUrl_or_filePath)_required" },
+        { status: 400 },
+      );
     }
 
     const payload: Raw & {
@@ -246,26 +417,43 @@ export async function POST(req: Request) {
       filePath,
       thumbUrl: typeof body.thumbUrl === "string" ? body.thumbUrl.trim() : "",
       durationSec:
-        typeof body.durationSec === "number" && isFinite(body.durationSec) ? Math.floor(body.durationSec) : undefined,
-      category: typeof body.category === "string" ? body.category.trim() : undefined,
+        typeof body.durationSec === "number" && isFinite(body.durationSec)
+          ? Math.floor(body.durationSec)
+          : undefined,
+      category:
+        typeof body.category === "string" ? body.category.trim() : undefined,
       tags: normalizeTags(body.tags) ?? [],
       published: typeof body.published === "boolean" ? body.published : true,
       publishedAt: parsePublishedAt(body.publishedAt) ?? new Date(),
-      storagePath: typeof body.storagePath === "string" ? body.storagePath.trim() : undefined,
+      storagePath:
+        typeof body.storagePath === "string"
+          ? body.storagePath.trim()
+          : undefined,
       type: typeof body.type === "string" ? body.type.trim() : undefined,
-      targetUrl: typeof body.targetUrl === "string" ? body.targetUrl.trim() : undefined,
+      targetUrl:
+        typeof body.targetUrl === "string" ? body.targetUrl.trim() : undefined,
     };
 
     let newId = body.id && String(body.id).trim();
     if (newId) {
-      await setDoc(doc(db, "videos", newId), payload as Record<string, unknown>, { merge: true });
+      await setDoc(
+        doc(db, "videos", newId),
+        payload as Record<string, unknown>,
+        { merge: true },
+      );
     } else {
-      const added = await addDoc(collection(db, "videos"), payload as Record<string, unknown>);
+      const added = await addDoc(
+        collection(db, "videos"),
+        payload as Record<string, unknown>,
+      );
       newId = added.id;
     }
 
     const snap = await getDoc(doc(db, "videos", newId));
-    return NextResponse.json({ ok: true, video: shape(snap.id, snap.data() as Raw) }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { ok: true, video: shape(snap.id, snap.data() as Raw) },
+      { status: 201, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (err) {
     console.error("POST /api/videos error:", err);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });

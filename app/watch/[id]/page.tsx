@@ -1,62 +1,45 @@
-// app/watch/[id]/page.tsx
-import { headers } from "next/headers";
-import SwipeViewer from "@/components/SwipeViewer";
+import { Suspense } from 'react';
+import WatchClient from '../watch-client';
+import type { Video } from '@/types/video';
+import { listByCategory, listBySearch, listBySection, listByTag } from '@/lib/videosRepo';
 
-type V = {
-  id: string;
-  title: string;
-  fileUrl: string;
-  thumbUrl?: string;
-  durationSec?: number;
-  category?: string;
-};
-
-async function base() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host =
-    h.get("x-forwarded-host") ??
-    h.get("host") ??
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "");
-  return `${proto}://${host}`;
-}
-
-async function getById(id: string): Promise<V | null> {
-  const origin = await base();
-  const res = await fetch(`${origin}/api/videos?id=${encodeURIComponent(id)}`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return (data.videos as V[])?.[0] ?? null;
-}
-
-async function getByCategory(cat?: string): Promise<V[]> {
-  const origin = await base();
-  const qs = cat ? `?category=${encodeURIComponent(cat)}&limit=100` : "";
-  const res = await fetch(`${origin}/api/videos${qs}`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return (data.videos as V[]) ?? [];
-}
-
-export default async function WatchPage({
-  params,
-}: {
+export default async function Page(props: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ src?: string; slug?: string; key?: string; q?: string }>;
 }) {
-  const { id } = await params;
-  const v = await getById(id);
+  const { id } = await props.params;
+  const { src, slug, key, q } = await props.searchParams;
 
-  if (!v) {
-    return (
-      <main className="grid h-[100dvh] place-content-center bg-black text-white">
-        動画が見つかりません
-      </main>
-    );
+  let items: Video[] = [];
+
+  if (src === 'tag' && slug)           items = await listByTag(slug);
+  else if (src === 'category' && slug) items = await listByCategory(slug);
+  else if (src === 'section' && key)   items = await listBySection(key);
+  else if (src === 'search' && q)      items = await listBySearch(q);
+  else {
+    // フォールバック：必要なら getVideo(id) 等に差し替え
+    items = [];
   }
 
-  const list = await getByCategory(v.category);
-  const has = list.some((x) => x.id === id);
-  const videos = has ? list : [v, ...list];
+  if (!id) return <div style={{ padding: 16 }}>Invalid parameters.</div>;
 
-  return <SwipeViewer videos={videos} initialId={id} />;
+  return (
+    <Suspense fallback={<div style={{ padding: 16 }}>Loading…</div>}>
+      {items.length === 0 ? (
+        <div style={{ padding: 24 }}>
+          <h2 style={{ fontSize: 18, marginBottom: 8 }}>プレイリストが取得できませんでした</h2>
+          <div style={{ color: '#666' }}>
+            条件: src=<code>{String(src)}</code>
+            {slug ? <> / slug=<code>{slug}</code></> : null}
+            {key ? <> / key=<code>{key}</code></> : null}
+            {q ? <> / q=<code>{q}</code></> : null}
+            <br />
+            API 応答が 500 の可能性があります。slug や key を別の値で試すか、/api/videos を直接叩いて確認してください。
+          </div>
+        </div>
+      ) : (
+        <WatchClient items={items} initialId={String(id)} />
+      )}
+    </Suspense>
+  );
 }

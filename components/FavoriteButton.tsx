@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebaseConfig";
 import { ensureAuth } from "@/lib/firebaseConfig";
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 export default function FavoriteButton({ videoId }: { videoId: string }) {
   const [uid, setUid] = useState<string | null>(null);

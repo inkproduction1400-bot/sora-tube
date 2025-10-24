@@ -17,13 +17,8 @@
       "@/*": ["./*"]
     },
     "plugins": [{ "name": "next" }],
-    "types": ["node"]             // ★ 追加：Node 環境の型を有効化（tools/*.ts で必要）
+    "types": ["node"] // ★ 追加：Node 環境の型を有効化（tools/*.ts で必要）
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "next-env.d.ts",
-    ".next/types/**/*.ts"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "next-env.d.ts", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

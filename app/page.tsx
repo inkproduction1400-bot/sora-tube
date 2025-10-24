@@ -19,19 +19,19 @@ type V = {
 };
 
 const JOB_CATEGORIES = [
-  { key: "nurse",  label: "看護師",   href: "/c/job/nurse" },
-  { key: "suits",  label: "スーツ",   href: "/c/job/suits" },
+  { key: "nurse", label: "看護師", href: "/c/job/nurse" },
+  { key: "suits", label: "スーツ", href: "/c/job/suits" },
   { key: "caster", label: "女子アナ", href: "/c/job/caster" },
-  { key: "jk",     label: "JK",       href: "/c/job/jk" },
-  { key: "gal",    label: "ギャル",   href: "/c/job/gal" },
+  { key: "jk", label: "JK", href: "/c/job/jk" },
+  { key: "gal", label: "ギャル", href: "/c/job/gal" },
 ];
 
 const STYLE_CATEGORIES = [
-  { key: "happening", label: "ハプニング系",  href: "/c/style/happening" },
-  { key: "fps",       label: "一人称視点",    href: "/c/style/fps" },
-  { key: "mazo",      label: "M系",          href: "/c/style/mazo" },
-  { key: "sado",      label: "S系",          href: "/c/style/sado" },
-  { key: "etc",       label: "その他",        href: "/c/style/etc" },
+  { key: "happening", label: "ハプニング系", href: "/c/style/happening" },
+  { key: "fps", label: "一人称視点", href: "/c/style/fps" },
+  { key: "mazo", label: "M系", href: "/c/style/mazo" },
+  { key: "sado", label: "S系", href: "/c/style/sado" },
+  { key: "etc", label: "その他", href: "/c/style/etc" },
 ];
 
 async function base() {
@@ -44,6 +44,7 @@ async function base() {
   return `${proto}://${host}`;
 }
 
+/** 共通フェッチ（/api/videos にそのまま渡す） */
 async function getVideos(params?: Record<string, string>): Promise<V[]> {
   const origin = await base();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : "";
@@ -53,45 +54,82 @@ async function getVideos(params?: Record<string, string>): Promise<V[]> {
   return (data.videos as V[]) ?? [];
 }
 
+/** セクションAPI（recommended/latest/recent など） */
+const getSection = (key: string, limit = "6") =>
+  getVideos({ src: "section", key, limit });
+
+/** カテゴリAPI（職業/スタイルなど） */
+const getCategory = (slug: string, limit = "6") =>
+  getVideos({ src: "category", slug, limit });
+
 export default async function HomePage() {
-  // 主要3セクション
-  const [recommended, latest, recent] = await Promise.all([
-    getVideos({ category: "recommended", limit: "6" }),
-    getVideos({ category: "latest",      limit: "6" }),
-    getVideos({ category: "recent",      limit: "6" }),
+  // 主要2セクション（おすすめ / 新作）
+  const [recommended, latest] = await Promise.all([
+    getSection("recommended", "6"),
+    getSection("latest", "6"),
   ]);
 
-  // 新カテゴリに合わせた取得
-  const [
-    nurse, suits, caster, jk, gal,
-    happening, fps, mazo, sado, etcCat
-  ] = await Promise.all([
-    getVideos({ category: "nurse",     limit: "6" }),
-    getVideos({ category: "suits",     limit: "6" }),
-    getVideos({ category: "caster",    limit: "6" }),
-    getVideos({ category: "jk",        limit: "6" }),
-    getVideos({ category: "gal",       limit: "6" }),
-    getVideos({ category: "happening", limit: "6" }),
-    getVideos({ category: "fps",       limit: "6" }),
-    getVideos({ category: "mazo",      limit: "6" }),
-    getVideos({ category: "sado",      limit: "6" }),
-    getVideos({ category: "etc",       limit: "6" }),
-  ]);
+  // 新カテゴリに合わせた取得（職業/スタイル）
+  const [nurse, suits, caster, jk, gal, happening, fps, mazo, sado, etcCat] =
+    await Promise.all([
+      getCategory("nurse", "6"),
+      getCategory("suits", "6"),
+      getCategory("caster", "6"),
+      getCategory("jk", "6"),
+      getCategory("gal", "6"),
+      getCategory("happening", "6"),
+      getCategory("fps", "6"),
+      getCategory("mazo", "6"),
+      getCategory("sado", "6"),
+      getCategory("etc", "6"),
+    ]);
 
   const nothing =
     (recommended?.length ?? 0) +
-    (latest?.length ?? 0) +
-    (recent?.length ?? 0) +
-    (nurse?.length ?? 0) +
-    (suits?.length ?? 0) +
-    (caster?.length ?? 0) +
-    (jk?.length ?? 0) +
-    (gal?.length ?? 0) +
-    (happening?.length ?? 0) +
-    (fps?.length ?? 0) +
-    (mazo?.length ?? 0) +
-    (sado?.length ?? 0) +
-    (etcCat?.length ?? 0) === 0;
+      (latest?.length ?? 0) +
+      (nurse?.length ?? 0) +
+      (suits?.length ?? 0) +
+      (caster?.length ?? 0) +
+      (jk?.length ?? 0) +
+      (gal?.length ?? 0) +
+      (happening?.length ?? 0) +
+      (fps?.length ?? 0) +
+      (mazo?.length ?? 0) +
+      (sado?.length ?? 0) +
+      (etcCat?.length ?? 0) ===
+    0;
+
+  // 「もっと→」は共通プレイヤーへ（先頭IDがある場合のみ）
+  const moreRecommended =
+    recommended[0]?.id
+      ? `/watch/${recommended[0].id}?src=section&key=recommended`
+      : "/search?tab=recommended";
+  const moreLatest =
+    latest[0]?.id
+      ? `/watch/${latest[0].id}?src=section&key=latest`
+      : "/search?tab=latest";
+  const moreNurse =
+    nurse[0]?.id ? `/watch/${nurse[0].id}?src=category&slug=nurse` : "/c/job/nurse";
+  const moreSuits =
+    suits[0]?.id ? `/watch/${suits[0].id}?src=category&slug=suits` : "/c/job/suits";
+  const moreCaster =
+    caster[0]?.id ? `/watch/${caster[0].id}?src=category&slug=caster` : "/c/job/caster";
+  const moreJk =
+    jk[0]?.id ? `/watch/${jk[0].id}?src=category&slug=jk` : "/c/job/jk";
+  const moreGal =
+    gal[0]?.id ? `/watch/${gal[0].id}?src=category&slug=gal` : "/c/job/gal";
+  const moreHappening =
+    happening[0]?.id
+      ? `/watch/${happening[0].id}?src=category&slug=happening`
+      : "/c/style/happening";
+  const moreFps =
+    fps[0]?.id ? `/watch/${fps[0].id}?src=category&slug=fps` : "/c/style/fps";
+  const moreMazo =
+    mazo[0]?.id ? `/watch/${mazo[0].id}?src=category&slug=mazo` : "/c/style/mazo";
+  const moreSado =
+    sado[0]?.id ? `/watch/${sado[0].id}?src=category&slug=sado` : "/c/style/sado";
+  const moreEtc =
+    etcCat[0]?.id ? `/watch/${etcCat[0].id}?src=category&slug=etc` : "/c/style/etc";
 
   return (
     <main className="min-h-[100dvh] bg-black text-white">
@@ -104,44 +142,44 @@ export default async function HomePage() {
           <CategoryPills items={STYLE_CATEGORIES} />
         </div>
 
-        {/* あなたにおすすめ */}
-        <SectionHeader title="あなたにおすすめ" moreHref="/search?tab=recommended" />
+        {/* あなたにおすすめ（section=recommended） */}
+        <SectionHeader title="あなたにおすすめ" moreHref={moreRecommended} />
         <ThumbGrid videos={recommended} />
 
-        {/* 新作 */}
-        <SectionHeader title="新作" moreHref="/search?tab=latest" />
+        {/* 新作（section=latest） */}
+        <SectionHeader title="新作" moreHref={moreLatest} />
         <ThumbGrid videos={latest} />
 
         {/* 職業別 */}
-        <SectionHeader title="職業別：看護師" moreHref="/c/job/nurse" />
+        <SectionHeader title="職業別：看護師" moreHref={moreNurse} />
         <ThumbGrid videos={nurse} />
 
-        <SectionHeader title="職業別：スーツ" moreHref="/c/job/suits" />
+        <SectionHeader title="職業別：スーツ" moreHref={moreSuits} />
         <ThumbGrid videos={suits} />
 
-        <SectionHeader title="職業別：女子アナ" moreHref="/c/job/caster" />
+        <SectionHeader title="職業別：女子アナ" moreHref={moreCaster} />
         <ThumbGrid videos={caster} />
 
-        <SectionHeader title="職業別：JK" moreHref="/c/job/jk" />
+        <SectionHeader title="職業別：JK" moreHref={moreJk} />
         <ThumbGrid videos={jk} />
 
-        <SectionHeader title="職業別：ギャル" moreHref="/c/job/gal" />
+        <SectionHeader title="職業別：ギャル" moreHref={moreGal} />
         <ThumbGrid videos={gal} />
 
         {/* スタイル別 */}
-        <SectionHeader title="動画スタイル：ハプニング系" moreHref="/c/style/happening" />
+        <SectionHeader title="動画スタイル：ハプニング系" moreHref={moreHappening} />
         <ThumbGrid videos={happening} />
 
-        <SectionHeader title="動画スタイル：一人称視点" moreHref="/c/style/fps" />
+        <SectionHeader title="動画スタイル：一人称視点" moreHref={moreFps} />
         <ThumbGrid videos={fps} />
 
-        <SectionHeader title="動画スタイル：M系" moreHref="/c/style/mazo" />
+        <SectionHeader title="動画スタイル：M系" moreHref={moreMazo} />
         <ThumbGrid videos={mazo} />
 
-        <SectionHeader title="動画スタイル：S系" moreHref="/c/style/sado" />
+        <SectionHeader title="動画スタイル：S系" moreHref={moreSado} />
         <ThumbGrid videos={sado} />
 
-        <SectionHeader title="動画スタイル：その他" moreHref="/c/style/etc" />
+        <SectionHeader title="動画スタイル：その他" moreHref={moreEtc} />
         <ThumbGrid videos={etcCat} />
 
         {nothing && (
@@ -159,7 +197,13 @@ export default async function HomePage() {
   );
 }
 
-function SectionHeader({ title, moreHref }: { title: string; moreHref: string }) {
+function SectionHeader({
+  title,
+  moreHref,
+}: {
+  title: string;
+  moreHref: string;
+}) {
   return (
     <div className="mb-3 mt-5 flex items-center justify-between">
       <h2 className="text-[22px] font-extrabold tracking-wide">{title}</h2>

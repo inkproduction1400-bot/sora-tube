@@ -28,7 +28,7 @@ export async function GET(req: Request) {
       where("published", "==", true),
       where("tags", "array-contains", tag),
       orderBy("publishedAt", "desc"),
-      limit(30)
+      limit(30),
     );
   } else if (qText) {
     q = query(
@@ -37,14 +37,14 @@ export async function GET(req: Request) {
       orderBy("title"),
       startAt(qText),
       endAt(qText + "\uf8ff"),
-      limit(30)
+      limit(30),
     );
   } else {
     q = query(
       ref,
       where("published", "==", true),
       orderBy("publishedAt", "desc"),
-      limit(30)
+      limit(30),
     );
   }
 

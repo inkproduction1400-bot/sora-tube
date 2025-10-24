@@ -27,8 +27,8 @@ export default function AdminVideoEditor({ initial }: { initial: V }) {
         (tagsInput || "")
           .split(/[,\s]+/)
           .map((s) => s.trim().toLowerCase())
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     );
   }, [tagsInput]);
 
@@ -85,7 +85,10 @@ export default function AdminVideoEditor({ initial }: { initial: V }) {
         <div className="mt-2 flex flex-wrap gap-2">
           {chips.length ? (
             chips.map((c) => (
-              <span key={c} className="rounded-full bg-white/15 px-2 py-0.5 text-xs">
+              <span
+                key={c}
+                className="rounded-full bg-white/15 px-2 py-0.5 text-xs"
+              >
                 {c}
               </span>
             ))

@@ -25,7 +25,10 @@ const nextConfig: NextConfig = {
       {
         source: "/img/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
       // API は既定でキャッシュしない（必要に応じて各APIで上書き）

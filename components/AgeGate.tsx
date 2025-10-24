@@ -22,7 +22,10 @@ export default function AgeGate() {
         </p>
         <div className="mt-4 flex gap-2">
           <button
-            onClick={() => { localStorage.setItem("age_ok","1"); setOpen(false); }}
+            onClick={() => {
+              localStorage.setItem("age_ok", "1");
+              setOpen(false);
+            }}
             className="flex-1 rounded-lg bg-white/90 px-4 py-2 text-black font-semibold"
           >
             18歳以上です（入場）

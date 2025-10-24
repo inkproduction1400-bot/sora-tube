@@ -24,7 +24,7 @@ async function base() {
 async function getByCategory(slug: string): Promise<V[]> {
   const res = await fetch(
     `${await base()}/api/videos?category=${encodeURIComponent(slug)}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
   if (!res.ok) return [];
   const data = await res.json();

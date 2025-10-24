@@ -6,7 +6,7 @@ type NewVideo = {
   title: string;
   category: string;
   tags?: string[];
-  fileUrl: string;   // Supabase Public URL
+  fileUrl: string; // Supabase Public URL
   thumbUrl?: string;
   durationSec?: number;
   published?: boolean;

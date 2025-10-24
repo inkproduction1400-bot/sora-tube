@@ -6,7 +6,12 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: fs.existsSync(".env.local") ? ".env.local" : ".env" });
 
 import { createClient } from "@supabase/supabase-js";
-import { getApps, initializeApp, applicationDefault, cert } from "firebase-admin/app";
+import {
+  getApps,
+  initializeApp,
+  applicationDefault,
+  cert,
+} from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 /* =========================
@@ -18,10 +23,12 @@ if (!getApps().length) {
     initializeApp({ credential: applicationDefault() });
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     // 例: FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}（1行JSON）
-    initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+    initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+    });
   } else {
     throw new Error(
-      "Missing credentials: set GOOGLE_APPLICATION_CREDENTIALS (path) or FIREBASE_SERVICE_ACCOUNT (inline JSON)."
+      "Missing credentials: set GOOGLE_APPLICATION_CREDENTIALS (path) or FIREBASE_SERVICE_ACCOUNT (inline JSON).",
     );
   }
 }
@@ -34,8 +41,10 @@ const SUPABASE_URL =
   process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-if (!SUPABASE_URL) throw new Error("SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL is required.");
-if (!SUPABASE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required (service role).");
+if (!SUPABASE_URL)
+  throw new Error("SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL is required.");
+if (!SUPABASE_KEY)
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY is required (service role).");
 
 const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -95,14 +104,18 @@ async function listAllFiles(prefix: string): Promise<string[]> {
 
     for (;;) {
       // cur === "" のときは undefined を渡す → バケット直下を列挙
-      const { data, error } = await supa.storage.from(BUCKET).list(cur || undefined, {
-        limit,
-        offset,
-      });
+      const { data, error } = await supa.storage
+        .from(BUCKET)
+        .list(cur || undefined, {
+          limit,
+          offset,
+        });
       if (error) throw error;
 
       const count = data?.length ?? 0;
-      console.log(`  [list] dir="${cur || "/"}" -> ${count} items (offset=${offset})`);
+      console.log(
+        `  [list] dir="${cur || "/"}" -> ${count} items (offset=${offset})`,
+      );
       if (!data || count === 0) break;
 
       for (const entry of data) {
@@ -110,7 +123,8 @@ async function listAllFiles(prefix: string): Promise<string[]> {
         // - Supabase はフォルダで id=null / metadata=null なことが多い
         // - かつ拡張子でファイル推定
         const looksLikeFile = /\.(mp4|mov|m4v)$/i.test(entry.name);
-        const isFolder = entry.id === null || (entry.metadata == null && !looksLikeFile);
+        const isFolder =
+          entry.id === null || (entry.metadata == null && !looksLikeFile);
 
         if (isFolder) {
           const next = (cur ? `${cur}/` : "") + entry.name;
@@ -150,7 +164,7 @@ async function main() {
     const payload = {
       title,
       fileUrl: publicUrl(filePath),
-      filePath,              // API 側で補完に使う
+      filePath, // API 側で補完に使う
       storagePath: filePath, // 互換
       published: true,
       publishedAt: new Date(),

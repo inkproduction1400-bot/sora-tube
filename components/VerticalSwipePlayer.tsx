@@ -2,7 +2,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type TouchEventHandler } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type TouchEventHandler,
+} from "react";
 import AdSlot from "@/components/AdSlot";
 
 type V = {
@@ -26,13 +32,17 @@ export default function VerticalSwipePlayer({
   startIndex?: number;
 }) {
   const adEnabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
-  const freq = Math.max(2, Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "4"));
+  const freq = Math.max(
+    2,
+    Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "4"),
+  );
 
   const merged: Item[] = useMemo(() => {
     if (!adEnabled) return videos;
     const out: Item[] = [];
     videos.forEach((v, idx) => {
-      if (idx > 0 && idx % freq === 0) out.push({ __ad: true, key: `ad-${idx}` });
+      if (idx > 0 && idx % freq === 0)
+        out.push({ __ad: true, key: `ad-${idx}` });
       out.push(v);
     });
     return out;
@@ -60,7 +70,9 @@ export default function VerticalSwipePlayer({
     if (isAd) return;
     const v = vref.current;
     if (!v) return;
-    try { v.pause(); } catch {}
+    try {
+      v.pause();
+    } catch {}
     v.currentTime = 0;
     v.muted = true;
     void v.play().catch(() => {});
@@ -68,7 +80,8 @@ export default function VerticalSwipePlayer({
 
   useEffect(() => {
     if (isAd) return;
-    const v = vref.current; if (!v) return;
+    const v = vref.current;
+    if (!v) return;
     v.muted = isMuted;
     if (!isMuted && ready) {
       void v.play().catch(() => {});
@@ -87,7 +100,9 @@ export default function VerticalSwipePlayer({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   const onTouchStart: TouchEventHandler<HTMLDivElement> = (e) => {
@@ -116,8 +131,7 @@ export default function VerticalSwipePlayer({
   const onTouchEnd: TouchEventHandler<HTMLDivElement> = () => {
     const dy = lastDy.current;
     const atTop = i === 0;
-    theEnd:
-    {
+    theEnd: {
       const atBottom = i === merged.length - 1;
 
       if ((atTop && dy > 0) || (atBottom && dy < 0)) {
@@ -216,8 +230,12 @@ export default function VerticalSwipePlayer({
                 </button>
               )}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                <div className="line-clamp-2 text-sm font-semibold">{cur.title}</div>
-                {cur.category && <div className="mt-1 text-xs opacity-80">#{cur.category}</div>}
+                <div className="line-clamp-2 text-sm font-semibold">
+                  {cur.title}
+                </div>
+                {cur.category && (
+                  <div className="mt-1 text-xs opacity-80">#{cur.category}</div>
+                )}
               </div>
             </>
           )}
