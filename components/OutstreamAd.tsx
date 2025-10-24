@@ -1,43 +1,66 @@
+// components/OutstreamAd.tsx
 "use client";
+
 import Script from "next/script";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 export default function OutstreamAd() {
   const enabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
-  const zoneId =
-    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM ||
-    process.env.NEXT_PUBLIC_EXO_OUT_ZONE_ID; // どちらでも拾う
-  const outClass =
-    process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM ||
-    process.env.NEXT_PUBLIC_EXO_OUT_CLASS ||
-    "eas6a97888e37";
-  const domId = useId().replace(/:/g, "_");
 
-  if (!enabled || !zoneId) return null;
+  // ← ここで「どの名前でも拾う」ように統一
+  const outClass =
+    process.env.NEXT_PUBLIC_EXO_OUTSTREAM_CLASS ||
+    process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM ||
+    process.env.NEXT_PUBLIC_EXO_OUT_CLASS || // 旧命名の保険
+    "";
+
+  const zoneId =
+    process.env.NEXT_PUBLIC_EXO_OUTSTREAM_ZONE_ID ||
+    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM ||
+    process.env.NEXT_PUBLIC_EXO_OUT_ZONE_ID || // 旧命名の保険
+    "";
+
+  const domId = useId().replace(/:/g, "_");
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 5秒後に“<ins>が存在するか/高さが出ているか”をチェック
+  useEffect(() => {
+    if (!mounted) return;
+    const t = setTimeout(() => {
+      const host = document.getElementById(domId);
+      const ins = host?.querySelector("ins");
+      const h = host?.getBoundingClientRect().height ?? 0;
+      // デバッグログ
+      // eslint-disable-next-line no-console
+      console.log("[OutstreamAd] enabled=%s class=%s zone=%s ins=%s height=%s",
+        enabled, outClass, zoneId, !!ins, h);
+      if (!ins) {
+        host?.setAttribute("data-ad-debug", "no-ins");
+        host?.classList.add("ring-2", "ring-red-500");
+      } else if (h < 12) {
+        host?.setAttribute("data-ad-debug", "no-fill");
+        host?.classList.add("ring-2", "ring-yellow-500");
+      }
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [mounted, domId, enabled, outClass, zoneId]);
+
+  if (!enabled || !outClass || !zoneId) return null;
 
   return (
-    <div className="relative flex items-center justify-center py-6">
-      {/* SDK（重複読込OK、NextのScriptは一意idで制御） */}
-      <Script
-        id="magsrv-sdk-global"
-        src="https://a.magsrv.com/ad-provider.js"
-        strategy="afterInteractive"
-      />
-      {/* ゾーン本体（十分な可視領域を確保） */}
-      <ins
-        className={outClass}
-        data-zoneid={zoneId}
-        style={{
-          display: "block",
-          width: "100%",
-          maxWidth: 640,
-          minHeight: 250, // ← viewability/no-fill対策
-        }}
-      />
-      {/* 初期化キュー：SDK未読でも配列pushされ、後で処理される */}
-      <Script id={`magsrv-init-${domId}`} strategy="afterInteractive">
-        {`(window.AdProvider = window.AdProvider || []).push({ serve: {} });`}
-      </Script>
+    <div className="mx-auto flex h-[90vh] w-full items-center justify-center rounded-2xl bg-black/80">
+      <div id={domId} className="w-[360px] max-w-[92vw]">
+        <Script id={`magsrv-sdk-${domId}`} src="https://a.magsrv.com/ad-provider.js" strategy="afterInteractive" />
+        <ins className={outClass} data-zoneid={zoneId}></ins>
+        <Script id={`magsrv-init-${domId}`} strategy="afterInteractive">
+          {`(window.AdProvider = window.AdProvider || []).push({ serve: {} });`}
+        </Script>
+      </div>
     </div>
   );
 }
