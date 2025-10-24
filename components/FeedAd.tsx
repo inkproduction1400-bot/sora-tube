@@ -2,7 +2,7 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 type Props = {
   id?: string;
@@ -13,6 +13,8 @@ type Props = {
   aspectRatio?: string;
   /** ノーフィル時に自動で畳むまでの猶予(ms) */
   nofillTimeoutMs?: number;
+  /** ★ 予約する最小高さ(px)。stickyと同じ考え方で上書き可 */
+  reserveMinPx?: number;
 };
 
 export default function FeedAd({
@@ -21,24 +23,32 @@ export default function FeedAd({
   rootMargin = "200px",
   aspectRatio = "16 / 9",
   nofillTimeoutMs = 4000,
+  reserveMinPx,
 }: Props) {
-  // 未設定なら true 扱い（"false" のときだけ無効）
-  const enabled =
-    (process.env.NEXT_PUBLIC_AD_ENABLED ?? "true").toLowerCase() !== "false";
+  const enabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
 
-  // ▼ Outstream 用ゾーン（新旧ENVに対応）
   const outClass =
     process.env.NEXT_PUBLIC_EXO_OUTSTREAM_CLASS ||
-    process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM; // 互換
+    process.env.NEXT_PUBLIC_EXO_CLASS_OUTSTREAM;
+
   const zoneId =
     process.env.NEXT_PUBLIC_EXO_OUTSTREAM_ZONE_ID ||
-    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM; // 互換
+    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM ||
+    process.env.NEXT_PUBLIC_EXO_OUT_ZONE_ID; // 互換
 
   const domId = useId().replace(/:/g, "_");
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const [shouldMount, setShouldMount] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  // ★ ENVの予備値（Feedでも横長バナーを入れるケースに備えて）
+  const envReserveMin = useMemo(() => {
+    const raw = process.env.NEXT_PUBLIC_EXO_FEED_MIN || process.env.NEXT_PUBLIC_EXO_RESERVE_MIN;
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, []);
+  const minH = reserveMinPx ?? envReserveMin; // 明示指定優先
 
   // ビューポート直前でロード開始（Lazy）
   useEffect(() => {
@@ -62,7 +72,7 @@ export default function FeedAd({
     return () => io.disconnect();
   }, [rootMargin]);
 
-  // ノーフィル検知 → 折りたたみ（空白を作らない）
+  // ノーフィル検知 → 折りたたみ
   useEffect(() => {
     if (!shouldMount || !wrapRef.current) return;
     const el = wrapRef.current;
@@ -70,7 +80,6 @@ export default function FeedAd({
     const t = setTimeout(() => {
       const rect = el.getBoundingClientRect();
       const hasChild = el.childElementCount > 0;
-      // 子要素がいない or 高さが付かない場合はノーフィル扱い
       if (!hasChild || rect.height < 12) {
         setCollapsed(true);
       }
@@ -79,42 +88,37 @@ export default function FeedAd({
     return () => clearTimeout(t);
   }, [shouldMount, nofillTimeoutMs]);
 
-  // 非表示条件
-  if (!enabled || !zoneId || !outClass || collapsed) {
-    return null;
-  }
+  if (!enabled || !zoneId || !outClass || collapsed) return null;
 
-  // clsx を使わずシンプル連結
   const wrapClass = ["w-full", className].filter(Boolean).join(" ");
 
   return (
     <div
       ref={wrapRef}
       className={wrapClass}
-      style={{ aspectRatio, position: "relative" }}
+      style={{
+        aspectRatio,
+        position: "relative",
+        ...(minH ? { minHeight: minH } : null),
+      }}
       aria-label="in-feed-ad"
       data-ad-id={id}
     >
-      {/* まだ可視域でなければ Script/タグを出さない（Lazy） */}
       {shouldMount ? (
         <div className="mx-auto flex h-full w-full items-center justify-center rounded-2xl bg-black/80">
           <div id={domId} className="w-[360px] max-w-[92vw]">
-            {/* 1) SDK */}
             <Script
               id={`magsrv-sdk-${domId}`}
               src="https://a.magsrv.com/ad-provider.js"
               strategy="afterInteractive"
             />
-            {/* 2) ゾーンタグ（class は管理画面の表示通りに） */}
             <ins className={outClass} data-zoneid={zoneId}></ins>
-            {/* 3) 初期化 */}
             <Script id={`magsrv-init-${domId}`} strategy="afterInteractive">
               {`(window.AdProvider = window.AdProvider || []).push({ serve: {} });`}
             </Script>
           </div>
         </div>
       ) : (
-        // 遅延中のプレースホルダ（CLS対策でスペースは予約済み）
         <div className="h-full w-full rounded-2xl bg-white/5" />
       )}
     </div>
