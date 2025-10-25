@@ -220,13 +220,13 @@ function SectionHeader({
   );
 }
 
-// ★ ここを差し替え：2枚ごとに FC2 300x250 を1枠（横幅いっぱいで挿入）
+// ★ 2枚ごとに FC2 300x250 を1枠（行全幅で挿入）
 function ThumbGrid({ videos }: { videos: V[] }) {
   if (!videos || videos.length === 0) {
     return <div className="grid grid-cols-2 gap-4 opacity-60" />;
   }
 
-  const FREQ = 2; // 2枚ごとに広告
+  const FREQ = 2;
 
   const items: React.ReactNode[] = [];
   videos.forEach((v, i) => {

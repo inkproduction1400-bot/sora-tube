@@ -11,8 +11,8 @@ import {
   type WheelEventHandler,
 } from "react";
 import Link from "next/link";
-// import OutstreamAd from "@/components/OutstreamAd";
-import FC2BannerAd from "@/components/FC2BannerAd";
+// import OutstreamAd from "@/components/OutstreamAd"; // ← 使わない
+import FC2BannerInline from "@/components/FC2BannerInline";
 
 type V = {
   id: string;
@@ -39,26 +39,24 @@ export default function SwipeViewer({
   adEvery?: number;
 }) {
   // --- 広告の有効化と頻度 ---
-  // 未設定なら true 扱い（"false" のときだけ無効）
   const adEnabled =
     (process.env.NEXT_PUBLIC_AD_ENABLED ?? "true").toLowerCase() !== "false";
 
   const envFreq =
-    process.env.NEXT_PUBLIC_EXO_FREQUENCY ??
-    process.env.NEXT_PUBLIC_AD_FREQUENCY ?? // 旧名フォールバック
+    process.env.NEXT_PUBLIC_AD_FREQUENCY ??
+    process.env.NEXT_PUBLIC_EXO_FREQUENCY ?? // 旧名フォールバック
     "3";
 
   const freqRaw = typeof adEvery === "number" ? adEvery : Number(envFreq);
-  const freq = Number.isFinite(freqRaw) ? Math.floor(freqRaw) : 3; // NaN ガード
-  const useAds = adEnabled && freq > 0; // freq <= 0 なら広告なし
+  const freq = Number.isFinite(freqRaw) ? Math.floor(freqRaw) : 3;
+  const useAds = adEnabled && freq > 0;
 
   // 広告を差し込んだ配列
   const merged: Item[] = useMemo(() => {
     if (!useAds) return videos;
-    const f = Math.max(1, freq); // 念のため最小 1
+    const f = Math.max(1, freq);
     const out: Item[] = [];
     videos.forEach((v, idx) => {
-      // 先頭の直前では挿入しない：idx > 0 のときのみチェック
       if (idx > 0 && idx % f === 0) out.push({ __ad: true, key: `ad-${idx}` });
       out.push(v);
     });
@@ -75,17 +73,13 @@ export default function SwipeViewer({
 
     if (!useAds) return pureIdx;
 
-    // pureIdx の手前に挿入された広告個数 = floor(pureIdx / freq)
     const adCountBefore = Math.floor(pureIdx / Math.max(1, freq));
     const idxWithAds = pureIdx + adCountBefore;
     return Math.max(0, Math.min(merged.length - 1, idxWithAds));
   }, [initialId, videos, useAds, freq, merged.length]);
 
-  // idx は videos/initialId 変化時に再同期
   const [idx, setIdx] = useState(startMergedIndex);
-  useEffect(() => {
-    setIdx(startMergedIndex);
-  }, [startMergedIndex]);
+  useEffect(() => setIdx(startMergedIndex), [startMergedIndex]);
 
   const curr = merged[idx];
   const isAd = !!curr && isAdItem(curr);
@@ -149,12 +143,10 @@ export default function SwipeViewer({
   const vref = useRef<HTMLVideoElement | null>(null);
   const [muted, setMuted] = useState(true);
 
-  // インデックス変更時：ミュートに戻す（広告行では動画処理なし）
   useEffect(() => {
     setMuted(true);
   }, [idx]);
 
-  // 動画ソースやミュート状態が変わったら再生
   useEffect(() => {
     if (isAd) return;
     const v = vref.current;
@@ -163,9 +155,7 @@ export default function SwipeViewer({
     v.play().catch(() => {});
   }, [isAd, muted, idx]);
 
-  // ---- Hooks はここまでに宣言（以降で条件分岐OK）----
-
-  // 広告を除いた“何本目/全体”インジケータ
+  // ---- 表示 ----
   const videoOrdinal = useMemo(() => {
     let count = 0;
     for (let k = 0; k <= idx; k++) {
@@ -175,7 +165,6 @@ export default function SwipeViewer({
   }, [idx, merged]);
   const totalVideos = videos.length;
 
-  // curr が無い場合
   if (!curr) {
     return (
       <main className="grid h-[100dvh] place-content-center bg-black text-white">
@@ -220,8 +209,14 @@ export default function SwipeViewer({
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
             {isAdItem(curr) ? (
-              // n本おきに FC2 バナーを挿入（1スクリーンに1枠のみ）
-              <FC2BannerAd size="300x250" />
+              // ★ FC2 320x50 を差し込み（300x250にしたい場合は variant="300x250"）
+              //   全画面黒つぶれを避けるため、コンパクトな帯レイアウトに変更
+              <div className="mx-auto mt-8 w-full max-w-[560px] px-4">
+                <div className="mb-2 text-center text-xs opacity-60">Sponsored</div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <FC2BannerInline variant="320x50" />
+                </div>
+              </div>
             ) : (
               <>
                 <video
