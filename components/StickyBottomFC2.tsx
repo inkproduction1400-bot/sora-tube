@@ -1,21 +1,22 @@
-// components/StickyBottomFC2.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 
 export default function StickyBottomFC2() {
+  // クリック先
   const href = useMemo(
     () =>
       "https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409",
     [],
   );
+
+  // 320x50（bid 20988）※320x100 を使うなら bid を 20987 に
   const rawImg = useMemo(
     () =>
       "https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=20988&uid=3553733",
     [],
   );
 
-  // ★ 自ドメイン経由に
   const imgSrc = useMemo(
     () => `/api/proxy-image?u=${encodeURIComponent(rawImg)}`,
     [rawImg],
@@ -42,9 +43,9 @@ export default function StickyBottomFC2() {
               <img
                 src={imgSrc}
                 alt="SOD select 見放題"
-                style={{ display: "block", width: "100%", height: "auto" }}
                 width={320}
-                height={50}
+                height={50} // 320x100 を使うなら 100 に
+                style={{ display: "block", width: "100%", height: "auto" }}
                 loading="eager"
                 decoding="async"
                 onError={() => setImgOk(false)}
