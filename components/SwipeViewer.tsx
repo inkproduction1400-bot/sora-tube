@@ -43,9 +43,7 @@ export default function SwipeViewer({
     (process.env.NEXT_PUBLIC_AD_ENABLED ?? "true").toLowerCase() !== "false";
 
   const envFreq =
-    process.env.NEXT_PUBLIC_AD_FREQUENCY ??
-    process.env.NEXT_PUBLIC_EXO_FREQUENCY ?? // 旧名フォールバック
-    "3";
+    process.env.NEXT_PUBLIC_AD_FREQUENCY ?? "3";
 
   const freqRaw = typeof adEvery === "number" ? adEvery : Number(envFreq);
   const freq = Number.isFinite(freqRaw) ? Math.floor(freqRaw) : 3;

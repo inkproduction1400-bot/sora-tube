@@ -35,7 +35,7 @@ export default function VerticalSwipePlayer({
   const adEnabled = process.env.NEXT_PUBLIC_AD_ENABLED === "true";
   const freq = Math.max(
     2,
-    Number(process.env.NEXT_PUBLIC_EXO_FREQUENCY || "4"),
+    Number(process.env.NEXT_PUBLIC_AD_FREQUENCY || "4"),
   );
 
   const merged: Item[] = useMemo(() => {
