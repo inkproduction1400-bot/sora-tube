@@ -206,12 +206,11 @@ export default function SwipeViewer({
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
             {isAdItem(curr) ? (
-              // ★ FC2 320x50 を差し込み（300x250にしたい場合は variant="300x250"）
-              //   全画面黒つぶれを避けるため、コンパクトな帯レイアウトに変更
+              // ★ プレイヤー内は 300x250 を表示（フォールバックは FC2BannerInline 側で処理）
               <div className="mx-auto mt-8 w-full max-w-[560px] px-4">
                 <div className="mb-2 text-center text-xs opacity-60">Sponsored</div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <FC2BannerInline variant="320x50" />
+                <div className="grid place-items-center rounded-xl border border-white/10 bg-white/5 p-3">
+                  <FC2BannerInline variant="300x250" reserveMinPx={260} rootMargin="0px" />
                 </div>
               </div>
             ) : (
