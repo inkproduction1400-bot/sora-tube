@@ -9,12 +9,12 @@ export default function FC2Banner300() {
       "https://cnt.affliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409",
     [],
   );
-  const imgSrc = useMemo(
+  const rawImg = useMemo(
     () =>
-      // 300x250 想定の bid
       "https://cnt.affliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=210010&uid=3553733",
     [],
   );
+  const imgSrc = useMemo(() => `/api/proxy-image?u=${encodeURIComponent(rawImg)}`, [rawImg]);
 
   const [imgOk, setImgOk] = useState(true);
 
@@ -36,10 +36,10 @@ export default function FC2Banner300() {
               src={imgSrc}
               alt="SOD select 見放題（300x250）"
               style={{ display: "block", width: "100%", height: "auto" }}
+              width={300}
+              height={250}
               loading="eager"
               decoding="async"
-              referrerPolicy="no-referrer"
-              crossOrigin="anonymous"
               onError={() => setImgOk(false)}
             />
           </a>
