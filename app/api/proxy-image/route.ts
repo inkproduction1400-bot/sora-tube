@@ -1,52 +1,66 @@
 // app/api/proxy-image/route.ts
+import { NextRequest, NextResponse } from "next/server";
+
 export const dynamic = "force-dynamic";
-// 任意: Edge/Node どちらでも可。必要なら以下を有効化
-// export const runtime = "edge";
 
-function bad(msg: string, code = 400) {
-  return new Response(msg, { status: code, headers: { "Content-Type": "text/plain; charset=utf-8" } });
-}
+// FC2の両表記（affiliate / affliate）と cnt サブドメインを許可
+const ALLOWED_HOSTS = new Set<string>([
+  "cnt.affiliate.fc2.com",
+  "affiliate.fc2.com",
+  "cnt.affliate.fc2.com",
+  "affliate.fc2.com",
+]);
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const u = url.searchParams.get("u");
-  if (!u) return bad("Missing query param: u");
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
-  // ここで許可リストをかけておく（安全のため）
+export async function GET(req: NextRequest): Promise<Response> {
+  const { searchParams } = new URL(req.url);
+  const u = searchParams.get("u");
+  if (!u) return new NextResponse("Missing param: u", { status: 400 });
+
+  let upstream: URL;
   try {
-    const upstream = new URL(u);
-    const allowed = /^https:\/\/cnt\.affiliate?\.fc2\.com\/cgi-bin\/banner\.cgi/i.test(upstream.href);
-    if (!allowed) return bad("blocked upstream", 400);
-
-    const r = await fetch(upstream.toString(), {
-      redirect: "follow",
-      headers: {
-        // iOS Safari 互換の UA/Accept を付与
-        "User-Agent":
-          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-        "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
-        "Accept-Language": "ja,en;q=0.9",
-        // 参照元が必要なケースに備えて自サイトを付ける
-        "Referer": "https://soratube.tokyo/",
-        "Cache-Control": "no-cache",
-      },
-    });
-
-    if (!r.ok) return bad(`upstream ${r.status}`, r.status);
-
-    const ct = r.headers.get("content-type") ?? "image/jpeg";
-    const body = await r.arrayBuffer();
-
-    // 画像として明示、キャッシュも付与
-    return new Response(body, {
-      status: 200,
-      headers: {
-        "Content-Type": ct,
-        // 5分ブラウザ、1日エッジ
-        "Cache-Control": "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
-      },
-    });
-  } catch (e: any) {
-    return bad(`error: ${e?.message ?? e}`, 500);
+    upstream = new URL(u);
+  } catch {
+    return new NextResponse("Invalid URL", { status: 400 });
   }
+
+  if (!ALLOWED_HOSTS.has(upstream.host)) {
+    return new NextResponse("Forbidden host", { status: 400 });
+  }
+
+  const upstreamRes = await fetch(upstream.toString(), {
+    headers: {
+      "user-agent": UA,
+      accept: "image/*,*/*;q=0.8",
+    },
+    // 画像は都度取得（CDNにキャッシュされる）
+    cache: "no-store",
+  });
+
+  const contentType = upstreamRes.headers.get("content-type") ?? "image/jpeg";
+  const status = upstreamRes.status;
+
+  // ストリーミングでそのまま返す
+  const body = upstreamRes.body;
+  if (body) {
+    return new Response(body, {
+      status,
+      headers: {
+        "content-type": contentType,
+        "cache-control": "public, max-age=300, s-maxage=300",
+      },
+    });
+  }
+
+  // bodyが無い場合はArrayBufferで返すフォールバック
+  const buf = await upstreamRes.arrayBuffer();
+  return new Response(buf, {
+    status,
+    headers: {
+      "content-type": contentType,
+      "cache-control": "public, max-age=300, s-maxage=300",
+    },
+  });
 }
