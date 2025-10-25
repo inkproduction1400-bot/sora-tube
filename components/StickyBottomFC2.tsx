@@ -6,12 +6,12 @@ import { useMemo, useState } from "react";
 export default function StickyBottomFC2() {
   const href = useMemo(
     () =>
-      "https://cnt.affliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409",
+      "https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409",
     [],
   );
   const rawImg = useMemo(
     () =>
-      "https://cnt.affliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=20988&uid=3553733",
+      "https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=20988&uid=3553733",
     [],
   );
 
