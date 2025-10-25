@@ -18,7 +18,7 @@ export default function StickyBottomAd() {
     process.env.NEXT_PUBLIC_EXO_ZONE_ID_BOTTOM ||
     process.env.NEXT_PUBLIC_EXO_ZONE_ID ||
     process.env.NEXT_PUBLIC_EXO_OUTSTREAM_ZONE_ID || // 互換
-    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM;      // 互換
+    process.env.NEXT_PUBLIC_EXO_ZONE_OUTSTREAM; // 互換
 
   const cls =
     process.env.NEXT_PUBLIC_EXO_CLASS_STICKY ||
@@ -28,7 +28,9 @@ export default function StickyBottomAd() {
 
   // ★ 追加: 予約高さ（px）。例: 50 / 60 / 90 など
   const reserveMinPx = useMemo(() => {
-    const raw = process.env.NEXT_PUBLIC_EXO_STICKY_MIN || process.env.NEXT_PUBLIC_EXO_RESERVE_MIN;
+    const raw =
+      process.env.NEXT_PUBLIC_EXO_STICKY_MIN ||
+      process.env.NEXT_PUBLIC_EXO_RESERVE_MIN;
     const n = raw ? parseInt(raw, 10) : NaN;
     // デフォルトは 60px（300x50/320x50 を少し余裕を持って）
     return Number.isFinite(n) && n > 0 ? n : 60;

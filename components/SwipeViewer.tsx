@@ -11,7 +11,8 @@ import {
   type WheelEventHandler,
 } from "react";
 import Link from "next/link";
-import OutstreamAd from "@/components/OutstreamAd";
+// import OutstreamAd from "@/components/OutstreamAd";
+import FC2BannerAd from "@/components/FC2BannerAd";
 
 type V = {
   id: string;
@@ -219,8 +220,8 @@ export default function SwipeViewer({
         <div className="mx-auto h-full w-full max-w-[560px]">
           <div className="relative h-full w-full">
             {isAdItem(curr) ? (
-              // n本おきに Outstream Video を挿入（1スクリーンに1枠のみ）
-              <OutstreamAd />
+              // n本おきに FC2 バナーを挿入（1スクリーンに1枠のみ）
+              <FC2BannerAd size="300x250" />
             ) : (
               <>
                 <video

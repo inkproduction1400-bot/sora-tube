@@ -4,6 +4,9 @@ import SiteHeader from "@/components/SiteHeader";
 import CategoryPills from "@/components/CategoryPills";
 import VideoCard from "@/components/VideoCard";
 
+// 追加：FC2 300x250 バナー
+import FC2Banner300 from "@/components/FC2Banner300";
+
 // 追加：固定バナー
 import StickyBottomAd from "@/components/StickyBottomAd";
 // （任意）右上フロートを使う場合はコメントアウトを外す
@@ -217,20 +220,25 @@ function SectionHeader({
   );
 }
 
+// ★ ここを差し替え：2枚ごとに FC2 300x250 を1枠（横幅いっぱいで挿入）
 function ThumbGrid({ videos }: { videos: V[] }) {
   if (!videos || videos.length === 0) {
-    return (
-      <div className="grid grid-cols-2 gap-4 opacity-60">
-        {/* skeleton を必要なら追加 */}
-      </div>
-    );
+    return <div className="grid grid-cols-2 gap-4 opacity-60" />;
   }
 
-  return (
-    <section className="grid grid-cols-2 gap-4">
-      {videos.map((v) => (
-        <VideoCard key={v.id} v={v} />
-      ))}
-    </section>
-  );
+  const FREQ = 2; // 2枚ごとに広告
+
+  const items: React.ReactNode[] = [];
+  videos.forEach((v, i) => {
+    if (i > 0 && i % FREQ === 0) {
+      items.push(
+        <div key={`fc2-${i}`} className="col-span-2">
+          <FC2Banner300 />
+        </div>,
+      );
+    }
+    items.push(<VideoCard key={v.id} v={v} />);
+  });
+
+  return <section className="grid grid-cols-2 gap-4">{items}</section>;
 }
