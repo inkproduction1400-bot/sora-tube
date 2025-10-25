@@ -11,7 +11,8 @@ export default function FC2Banner300() {
   );
   const imgSrc = useMemo(
     () =>
-      "https://cnt.affliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=210010&uid=3553733", // 300x250想定のbidに合わせてあります
+      // 300x250 想定の bid
+      "https://cnt.affliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=210010&uid=3553733",
     [],
   );
 
@@ -37,7 +38,8 @@ export default function FC2Banner300() {
               style={{ display: "block", width: "100%", height: "auto" }}
               loading="eager"
               decoding="async"
-              referrerPolicy="no-referrer-when-downgrade"
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
               onError={() => setImgOk(false)}
             />
           </a>
