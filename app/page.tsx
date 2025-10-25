@@ -7,8 +7,8 @@ import VideoCard from "@/components/VideoCard";
 // 追加：FC2 300x250 バナー
 import FC2Banner300 from "@/components/FC2Banner300";
 
-// 追加：固定バナー
-import StickyBottomAd from "@/components/StickyBottomAd";
+// 追加：固定バナー（FC2版）
+import StickyBottomFC2 from "@/components/StickyBottomFC2";
 // （任意）右上フロートを使う場合はコメントアウトを外す
 // import FloatingTopRightAd from "@/components/FloatingTopRightAd";
 
@@ -192,8 +192,8 @@ export default async function HomePage() {
         )}
       </div>
 
-      {/* 固定広告（ページ最下部・常時） */}
-      <StickyBottomAd />
+      {/* 固定広告（ページ最下部・常時 / FC2） */}
+      <StickyBottomFC2 />
       {/* 右上フロートを出すなら↓を有効化 */}
       {/* <FloatingTopRightAd /> */}
     </main>
