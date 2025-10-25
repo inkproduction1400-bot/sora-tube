@@ -23,9 +23,7 @@ export default function StickyBottomAd() {
 
   // 予約高さ（px）: 320x50想定で60pxを既定
   const reserveMinPx = useMemo(() => {
-    const raw =
-      process.env.NEXT_PUBLIC_FC2_STICKY_MIN ||
-      process.env.NEXT_PUBLIC_EXO_STICKY_MIN;
+    const raw = process.env.NEXT_PUBLIC_FC2_STICKY_MIN;
     const n = raw ? parseInt(raw, 10) : 60;
     return Number.isFinite(n) && n > 0 ? n : 60;
   }, []);
