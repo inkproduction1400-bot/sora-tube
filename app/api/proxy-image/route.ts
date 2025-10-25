@@ -1,45 +1,52 @@
 // app/api/proxy-image/route.ts
-import { NextRequest, NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
+// 任意: Edge/Node どちらでも可。必要なら以下を有効化
+// export const runtime = "edge";
 
-export async function GET(req: NextRequest) {
-  const u = req.nextUrl.searchParams.get("u");
-  if (!u) return new NextResponse("missing u", { status: 400 });
+function bad(msg: string, code = 400) {
+  return new Response(msg, { status: code, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
 
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const u = url.searchParams.get("u");
+  if (!u) return bad("Missing query param: u");
+
+  // ここで許可リストをかけておく（安全のため）
   try {
-    const upstream = await fetch(u, {
+    const upstream = new URL(u);
+    const allowed = /^https:\/\/cnt\.affiliate?\.fc2\.com\/cgi-bin\/banner\.cgi/i.test(upstream.href);
+    if (!allowed) return bad("blocked upstream", 400);
+
+    const r = await fetch(upstream.toString(), {
       redirect: "follow",
       headers: {
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        "User-Agent": req.headers.get("user-agent") ?? "",
+        // iOS Safari 互換の UA/Accept を付与
+        "User-Agent":
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+        "Accept-Language": "ja,en;q=0.9",
+        // 参照元が必要なケースに備えて自サイトを付ける
+        "Referer": "https://soratube.tokyo/",
+        "Cache-Control": "no-cache",
       },
-      cache: "no-store",
     });
 
-    if (!upstream.ok) {
-      return new NextResponse(`bad upstream: ${upstream.status}`, { status: 502 });
-    }
+    if (!r.ok) return bad(`upstream ${r.status}`, r.status);
 
-    const buf = await upstream.arrayBuffer();
-    const ct = upstream.headers.get("content-type") ?? "image/gif";
+    const ct = r.headers.get("content-type") ?? "image/jpeg";
+    const body = await r.arrayBuffer();
 
-    const ext =
-      ct.includes("jpeg") ? "jpg" :
-      ct.includes("png")  ? "png" :
-      ct.includes("webp") ? "webp" :
-      ct.includes("avif") ? "avif" : "gif";
-
-    return new NextResponse(buf, {
+    // 画像として明示、キャッシュも付与
+    return new Response(body, {
       status: 200,
       headers: {
         "Content-Type": ct,
-        "Content-Disposition": `inline; filename="banner.${ext}"`,
-        "Cache-Control": "public, s-maxage=3600, max-age=600",
-        "Access-Control-Allow-Origin": "*",
+        // 5分ブラウザ、1日エッジ
+        "Cache-Control": "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
       },
     });
-  } catch (e) {
-    return new NextResponse("error", { status: 500 });
+  } catch (e: any) {
+    return bad(`error: ${e?.message ?? e}`, 500);
   }
 }
