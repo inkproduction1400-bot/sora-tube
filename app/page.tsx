@@ -4,12 +4,11 @@ import SiteHeader from "@/components/SiteHeader";
 import CategoryPills from "@/components/CategoryPills";
 import VideoCard from "@/components/VideoCard";
 
-// 追加：FC2 300x250 バナー
-import FC2Banner300 from "@/components/FC2Banner300";
+// 置き換え：カード間は 320x100 生タグを使う共通ローダ
+import FC2BannerInline from "@/components/FC2BannerInline";
 
-// 追加：固定バナー（FC2版）
+// 固定バナー（FC2版）
 import StickyBottomFC2 from "@/components/StickyBottomFC2";
-// （任意）右上フロートを使う場合はコメントアウトを外す
 // import FloatingTopRightAd from "@/components/FloatingTopRightAd";
 
 type V = {
@@ -47,7 +46,6 @@ async function base() {
   return `${proto}://${host}`;
 }
 
-/** 共通フェッチ（/api/videos にそのまま渡す） */
 async function getVideos(params?: Record<string, string>): Promise<V[]> {
   const origin = await base();
   const qs = params ? `?${new URLSearchParams(params).toString()}` : "";
@@ -57,22 +55,17 @@ async function getVideos(params?: Record<string, string>): Promise<V[]> {
   return (data.videos as V[]) ?? [];
 }
 
-/** セクションAPI（recommended/latest/recent など） */
 const getSection = (key: string, limit = "6") =>
   getVideos({ src: "section", key, limit });
-
-/** カテゴリAPI（職業/スタイルなど） */
 const getCategory = (slug: string, limit = "6") =>
   getVideos({ src: "category", slug, limit });
 
 export default async function HomePage() {
-  // 主要2セクション（おすすめ / 新作）
   const [recommended, latest] = await Promise.all([
     getSection("recommended", "6"),
     getSection("latest", "6"),
   ]);
 
-  // 新カテゴリに合わせた取得（職業/スタイル）
   const [nurse, suits, caster, jk, gal, happening, fps, mazo, sado, etcCat] =
     await Promise.all([
       getCategory("nurse", "6"),
@@ -102,7 +95,6 @@ export default async function HomePage() {
       (etcCat?.length ?? 0) ===
     0;
 
-  // 「もっと→」は共通プレイヤーへ（先頭IDがある場合のみ）
   const moreRecommended =
     recommended[0]?.id
       ? `/watch/${recommended[0].id}?src=section&key=recommended`
@@ -139,21 +131,17 @@ export default async function HomePage() {
       <SiteHeader />
 
       <div className="mx-auto w-full max-w-md px-3 pb-16">
-        {/* 検索窓の直下にカテゴリーPills（職業別／スタイル） */}
         <div className="mt-2 space-y-2">
           <CategoryPills items={JOB_CATEGORIES} />
           <CategoryPills items={STYLE_CATEGORIES} />
         </div>
 
-        {/* あなたにおすすめ（section=recommended） */}
         <SectionHeader title="あなたにおすすめ" moreHref={moreRecommended} />
         <ThumbGrid videos={recommended} />
 
-        {/* 新作（section=latest） */}
         <SectionHeader title="新作" moreHref={moreLatest} />
         <ThumbGrid videos={latest} />
 
-        {/* 職業別 */}
         <SectionHeader title="職業別：看護師" moreHref={moreNurse} />
         <ThumbGrid videos={nurse} />
 
@@ -169,7 +157,6 @@ export default async function HomePage() {
         <SectionHeader title="職業別：ギャル" moreHref={moreGal} />
         <ThumbGrid videos={gal} />
 
-        {/* スタイル別 */}
         <SectionHeader title="動画スタイル：ハプニング系" moreHref={moreHappening} />
         <ThumbGrid videos={happening} />
 
@@ -194,7 +181,6 @@ export default async function HomePage() {
 
       {/* 固定広告（ページ最下部・常時 / FC2） */}
       <StickyBottomFC2 />
-      {/* 右上フロートを出すなら↓を有効化 */}
       {/* <FloatingTopRightAd /> */}
     </main>
   );
@@ -220,7 +206,7 @@ function SectionHeader({
   );
 }
 
-// ★ 2枚ごとに FC2 300x250 を1枠（行全幅で挿入）
+// ★ 2枚ごとに FC2 320x100 を1枠（行全幅で挿入）
 function ThumbGrid({ videos }: { videos: V[] }) {
   if (!videos || videos.length === 0) {
     return <div className="grid grid-cols-2 gap-4 opacity-60" />;
@@ -233,7 +219,8 @@ function ThumbGrid({ videos }: { videos: V[] }) {
     if (i > 0 && i % FREQ === 0) {
       items.push(
         <div key={`fc2-${i}`} className="col-span-2">
-          <FC2Banner300 />
+          {/* 生タグは NEXT_PUBLIC_FC2_TAG_320x50 に保存（320x100タグを格納） */}
+          <FC2BannerInline variant="320x50" reserveMinPx={110} />
         </div>,
       );
     }

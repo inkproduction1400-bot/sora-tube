@@ -16,7 +16,10 @@ export default function StickyBottomFC2() {
   );
 
   // ★ 自ドメイン経由に
-  const imgSrc = useMemo(() => `/api/proxy-image?u=${encodeURIComponent(rawImg)}`, [rawImg]);
+  const imgSrc = useMemo(
+    () => `/api/proxy-image?u=${encodeURIComponent(rawImg)}`,
+    [rawImg],
+  );
 
   const [imgOk, setImgOk] = useState(true);
 
