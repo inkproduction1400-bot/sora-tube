@@ -9,7 +9,8 @@ import {
   useState,
   type TouchEventHandler,
 } from "react";
-import AdSlot from "@/components/AdSlot";
+// ❌ import AdSlot from "@/components/AdSlot";
+import FC2BannerInline from "@/components/FC2BannerInline"; // ✅ 追加
 
 type V = {
   id: string;
@@ -201,7 +202,15 @@ export default function VerticalSwipePlayer({
           style={{ transform: `translateY(${offsetY}px)` }}
         >
           {isAdItem(cur) ? (
-            <AdSlot />
+            // ✅ EXOの AdSlot ではなく、FC2 の帯バナーをインラインで表示
+            <div className="grid h-full w-full place-items-center p-4">
+              <div className="w-full max-w-[560px]">
+                <div className="mb-2 text-center text-xs opacity-60">Sponsored</div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <FC2BannerInline variant="320x50" />
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <video
