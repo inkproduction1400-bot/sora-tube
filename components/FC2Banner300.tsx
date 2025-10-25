@@ -1,25 +1,57 @@
+// components/FC2Banner300.tsx
 "use client";
 
+import { useMemo, useState } from "react";
+
 export default function FC2Banner300() {
-  // スクショから復元（必要なら管理画面の正タグで置き換え）
-  const html = `
-<!-- バナー（SOD select見放題）ここから -->
-<a href="https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409" target="_blank">
-  <img src="https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=20988&uid=3553733" width="300" height="250" border="0" />
-</a>
-<!-- ここまで -->
-`.trim();
+  const href = useMemo(
+    () =>
+      "https://cnt.affliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409",
+    [],
+  );
+  const imgSrc = useMemo(
+    () =>
+      "https://cnt.affliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=210010&uid=3553733", // 300x250想定のbidに合わせてあります
+    [],
+  );
+
+  const [imgOk, setImgOk] = useState(true);
 
   return (
-    <div
-      className="w-full"
-      style={{ aspectRatio: "6 / 5" }} // 300x250 ≒ 6:5
-      aria-label="fc2-banner-300x250"
-    >
+    <div className="grid place-items-center py-2">
       <div
-        className="grid h-full w-full place-items-center overflow-hidden rounded-2xl bg-black/80"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+        className="rounded-xl border border-white/10 bg-white/5 p-3"
+        style={{ width: "100%", maxWidth: 340 }}
+      >
+        {imgOk ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="block mx-auto"
+            style={{ width: "100%", maxWidth: 320 }}
+          >
+            <img
+              src={imgSrc}
+              alt="SOD select 見放題（300x250）"
+              style={{ display: "block", width: "100%", height: "auto" }}
+              loading="eager"
+              decoding="async"
+              referrerPolicy="no-referrer-when-downgrade"
+              onError={() => setImgOk(false)}
+            />
+          </a>
+        ) : (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="block w-full rounded-lg bg-white/10 px-4 py-3 text-center text-sm hover:bg-white/15"
+          >
+            SOD select 見放題をチェック →
+          </a>
+        )}
+      </div>
     </div>
   );
 }
