@@ -1,76 +1,66 @@
 // app/api/i/[t]/route.ts
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_HOSTS = new Set<string>([
-  "cnt.affiliate.fc2.com",
-  "affiliate.fc2.com",
-  "cnt.affliate.fc2.com",
-  "affliate.fc2.com",
-]);
-
-function fromBase64Url(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (input.length % 4)) % 4);
-  return Buffer.from(b64, "base64").toString("utf8");
+function b64urlDecode(t: string): string {
+  // Base64URL → Base64
+  const b64 = t.replace(/-/g, "+").replace(/_/g, "/");
+  // パディング付与
+  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+  const raw = b64 + pad;
+  // atob 代替
+  const bin = Buffer.from(raw, "base64").toString("utf8");
+  return bin;
 }
-
-const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
 export async function GET(
   req: NextRequest,
-  ctx: { params: Promise<{ t: string }> } // ← Next.js 15 では Promise
+  ctx: { params: { t: string } }
 ): Promise<Response> {
-  const { t } = await ctx.params;
-  if (!t) return new Response("Missing token", { status: 400 });
-
-  let raw = "";
   try {
-    raw = fromBase64Url(t);
-  } catch {
-    return new Response("Bad token", { status: 400 });
-  }
+    const token = ctx.params?.t;
+    if (!token) {
+      return new Response("missing", { status: 400 });
+    }
 
-  let upstream: URL;
-  try {
-    upstream = new URL(raw);
-  } catch {
-    return new Response("Invalid URL", { status: 400 });
-  }
+    const url = b64urlDecode(token);
 
-  if (!ALLOWED_HOSTS.has(upstream.host)) {
-    return new Response("Forbidden host", { status: 400 });
-  }
-
-  const res = await fetch(upstream.toString(), {
-    headers: {
-      "user-agent": UA,
-      accept: "image/*,*/*;q=0.8",
-      referer: "https://soratube.tokyo/",
-    },
-    cache: "no-store",
-  });
-
-  const ct = res.headers.get("content-type") ?? "image/jpeg";
-  const status = res.status;
-
-  if (res.body) {
-    return new Response(res.body, {
-      status,
+    // 上流から取得（リダイレクトも追随）
+    const upstream = await fetch(url, {
+      // iOS Safari 対策：キャッシュを許容（長すぎない範囲で）
+      cache: "no-store",
+      redirect: "follow",
+      // 一部CDNがUAで分岐する場合に備えて
       headers: {
-        "content-type": ct,
-        "cache-control": "public, max-age=300, s-maxage=300",
+        "User-Agent":
+          "Mozilla/5.0 (compatible; SoraTubeImageProxy/1.0; +https://soratube.tokyo)",
       },
     });
-  }
 
-  const buf = await res.arrayBuffer();
-  return new Response(buf, {
-    status,
-    headers: {
-      "content-type": ct,
-      "cache-control": "public, max-age=300, s-maxage=300",
-    },
-  });
+    if (!upstream.ok) {
+      return new Response(`upstream ${upstream.status}`, {
+        status: 502,
+      });
+    }
+
+    // バイナリへ読み切る（Safariの白画面対策で Content-Length を付ける）
+    const arrayBuffer = await upstream.arrayBuffer();
+
+    // MIME 推定：上流優先、なければ JPEG に倒す
+    const mime =
+      upstream.headers.get("content-type")?.split(";")[0]?.trim() ||
+      "image/jpeg";
+
+    const headers = new Headers();
+    headers.set("Content-Type", mime);
+    headers.set("Cache-Control", "public, max-age=86400"); // 24h
+    headers.set("Content-Length", String(arrayBuffer.byteLength));
+    // ダウンロード扱いにさせない
+    headers.set("Content-Disposition", "inline");
+
+    return new Response(arrayBuffer, { status: 200, headers });
+  } catch (e) {
+    return new Response("error", { status: 500 });
+  }
 }
