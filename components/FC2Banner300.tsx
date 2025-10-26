@@ -1,37 +1,36 @@
-// components/FC2Banner300.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 
+function toBase64Url(s: string) {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(s, "utf8").toString("base64url");
+  }
+  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
 export default function FC2Banner300() {
-  // ▼ あなたが貼った「320x100」タグ（クリック先）
   const href = useMemo(
     () =>
-      "https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=355373&aff_siteid=347819&aff_shopid=409",
+      "https://cnt.affiliate.fc2.com/cgi-bin/click.cgi?aff_userid=3553738&aff_siteid=3478198&aff_shopid=409",
     [],
   );
 
-  // ▼ 画像（320x100）の生URL
+  // 300x250 用の画像先
   const rawImg = useMemo(
     () =>
-      "https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=347819&bid=20987&uid=355373",
+      "https://cnt.affiliate.fc2.com/cgi-bin/banner.cgi?aff_siteid=3478198&bid=210010&uid=3553733",
     [],
   );
 
-  // ▼ 画像は proxy 経由で配信（iOS Safari 対策）
-  const imgSrc = useMemo(
-    () => `/api/proxy-image.jpg?u=${encodeURIComponent(rawImg)}`,
-    [rawImg],
-  );
+  const token = useMemo(() => toBase64Url(rawImg), [rawImg]);
+  const imgSrc = useMemo(() => `/api/i/${token}`, [token]);
 
   const [imgOk, setImgOk] = useState(true);
 
   return (
     <div className="grid place-items-center py-2">
-      <div
-        className="rounded-xl border border-white/10 bg-white/5 p-3"
-        style={{ width: "100%", maxWidth: 340 }}
-      >
+      <div className="rounded-xl border border-white/10 bg-white/5 p-3" style={{ width: "100%", maxWidth: 360 }}>
         {imgOk ? (
           <a
             href={href}
@@ -42,11 +41,11 @@ export default function FC2Banner300() {
           >
             <img
               src={imgSrc}
-              alt="SOD select 見放題（320×100）"
-              width={320}
-              height={100}
+              alt="SOD select 見放題（300x250）"
               style={{ display: "block", width: "100%", height: "auto" }}
-              loading="lazy"
+              width={300}
+              height={250}
+              loading="eager"
               decoding="async"
               onError={() => setImgOk(false)}
             />
